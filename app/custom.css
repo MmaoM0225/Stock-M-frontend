@@ -1,0 +1,5 @@
+/* Custom styles for cases not suitable for Tailwind utility classes */
+
+.logo-font {
+  font-family: "Righteous", sans-serif;
+}
