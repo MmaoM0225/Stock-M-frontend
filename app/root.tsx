@@ -13,6 +13,7 @@ import { Header } from "./components/layout/header";
 import "./app.css";
 
 export const links: Route.LinksFunction = () => [
+  { rel: "icon", href: "/mmmm.jpg", type: "image/jpg" },
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {
     rel: "preconnect",

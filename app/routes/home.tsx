@@ -3,15 +3,15 @@ import { Link } from "react-router";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Stock-M Frontend" },
-    { name: "description", content: "Stock-M 前端骨架页面" },
+    { title: "Stock-M" },
+    { name: "description", content: "Stock-M" },
   ];
 }
 
 export default function Home() {
   return (
     <main className="mx-auto max-w-4xl px-6 py-10">
-      <h1 className="text-3xl font-bold">Stock-M 前端</h1>
+      <h1 className="text-3xl font-bold">Stock-M</h1>
       <p className="mt-2 text-gray-600 dark:text-gray-300">
         当前为骨架版本，先打通页面结构与路由导航。
       </p>
