@@ -3,12 +3,12 @@ import { Button } from "~/components/ui/button";
 import { Calendar } from "~/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "~/components/ui/popover";
-import { getMacroManagerByTradeDate, getMacroManagerDates, type MacroManagerData } from "~/lib/macro";
+import { getNewsAnalystByTradeDate, getNewsAnalystDates, type NewsAnalystData } from "~/lib/macro";
 
-export default function DataMacroPage() {
+export default function NewsAnalystPage() {
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState("");
-  const [currentOutput, setCurrentOutput] = useState<MacroManagerData | null>(null);
+  const [currentData, setCurrentData] = useState<NewsAnalystData | null>(null);
   const [loadingDates, setLoadingDates] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState("");
@@ -16,6 +16,10 @@ export default function DataMacroPage() {
   const selectedCalendarDate = useMemo(
     () => (selectedDate ? compactDateStringToDate(selectedDate) : undefined),
     [selectedDate]
+  );
+  const sectorEntries = useMemo(
+    () => Object.entries(currentData?.sector_impacts ?? {}),
+    [currentData?.sector_impacts]
   );
 
   useEffect(() => {
@@ -25,7 +29,7 @@ export default function DataMacroPage() {
       setLoadingDates(true);
       setError("");
       try {
-        const response = await getMacroManagerDates();
+        const response = await getNewsAnalystDates();
         const dates = response.data?.dates ?? [];
         if (disposed) return;
         setAvailableDates(dates);
@@ -46,7 +50,7 @@ export default function DataMacroPage() {
 
   useEffect(() => {
     if (!selectedDate) {
-      setCurrentOutput(null);
+      setCurrentData(null);
       return;
     }
 
@@ -55,13 +59,13 @@ export default function DataMacroPage() {
       setLoadingDetail(true);
       setError("");
       try {
-        const response = await getMacroManagerByTradeDate(selectedDate);
+        const response = await getNewsAnalystByTradeDate(selectedDate);
         if (disposed) return;
-        setCurrentOutput(response.data ?? null);
+        setCurrentData(response.data ?? null);
       } catch (err) {
         if (disposed) return;
-        setCurrentOutput(null);
-        setError(err instanceof Error ? err.message : "获取宏观经理数据失败");
+        setCurrentData(null);
+        setError(err instanceof Error ? err.message : "获取新闻分析数据失败");
       } finally {
         if (!disposed) setLoadingDetail(false);
       }
@@ -76,21 +80,17 @@ export default function DataMacroPage() {
   return (
     <section className="space-y-6">
       <div className="border border-slate-200 bg-white p-6">
-        <h1 className="text-2xl font-bold text-slate-900">宏观经理（Macro Manager）</h1>
+        <h1 className="text-2xl font-bold text-slate-900">宏观新闻分析师（News Analyst）</h1>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          展示 Macro Manager 的结构化输出（无图表版本），用于快速查看市场状态、仓位建议、重点方向与风险因子。
+          对高影响新闻做结构化归档，并输出行业冲击与宏观环境快照。
         </p>
         <div className="mt-4 flex items-center gap-3">
-          <label htmlFor="macro-manager-date" className="text-sm font-medium text-slate-700">
+          <label htmlFor="news-date" className="text-sm font-medium text-slate-700">
             选择日期
           </label>
           <Popover>
             <PopoverTrigger asChild>
-              <Button
-                id="macro-manager-date"
-                variant="outline"
-                className="w-[180px] justify-start text-left"
-              >
+              <Button id="news-date" variant="outline" className="w-[180px] justify-start text-left">
                 {selectedDate || "请选择"}
               </Button>
             </PopoverTrigger>
@@ -114,7 +114,7 @@ export default function DataMacroPage() {
       </div>
 
       {error ? <p className="text-sm text-rose-600">{error}</p> : null}
-      {!loadingDetail && !currentOutput ? (
+      {!loadingDetail && !currentData ? (
         <Card className="rounded-none py-0">
           <CardContent className="px-4 py-4 text-sm text-slate-500">暂无可展示的数据。</CardContent>
         </Card>
@@ -124,39 +124,74 @@ export default function DataMacroPage() {
           <CardContent className="px-4 py-4 text-sm text-slate-500">数据加载中...</CardContent>
         </Card>
       ) : null}
-      {currentOutput ? (
+      {currentData ? (
         <>
-          <div className="grid gap-4 md:grid-cols-3">
-            <InfoCard title="市场方向" value={currentOutput.market_direction} />
-            <InfoCard title="目标仓位" value={currentOutput.target_position} />
-            <InfoCard title="置信度" value={String(currentOutput.confidence)} />
-          </div>
+      <div className="grid gap-4 md:grid-cols-4">
+        <SignalCard title="流动性" value={currentData.macro_environment.liquidity} />
+        <SignalCard title="政策倾向" value={currentData.macro_environment.policy_bias} />
+        <SignalCard title="全球风险" value={currentData.macro_environment.global_risk} />
+        <SignalCard title="市场情绪" value={currentData.macro_environment.market_sentiment} />
+      </div>
 
-          <Card className="rounded-none py-0">
-            <CardHeader className="px-4 pt-4 pb-0">
-              <CardTitle className="text-base text-slate-900">市场状态</CardTitle>
-            </CardHeader>
-            <CardContent className="px-4 pt-3 pb-4 text-sm leading-6 text-slate-700">{currentOutput.market_regime}</CardContent>
-          </Card>
+      <Card className="rounded-none py-0">
+        <CardHeader className="px-4 pt-4 pb-0">
+          <CardTitle className="text-base text-slate-900">新闻事件（{currentData.events.length}）</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 px-4 pt-3 pb-4">
+          {currentData.events.map((event, index) => (
+            <div key={`${event.source}-${index}`} className="border border-slate-200 p-3">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                <span>{event.source}</span>
+                <span>·</span>
+                <span>{event.type}</span>
+                <span>·</span>
+                <span>impact {event.impact_level}</span>
+                <span>·</span>
+                <span>{event.sentiment}</span>
+              </div>
+              <p className="mt-2 text-sm leading-6 text-slate-700">{event.summary}</p>
+              <p className="mt-2 text-xs text-slate-500">行业：{event.industry.join(" / ")}</p>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <ListCard title="重点行业" items={currentOutput.focus_industry_sectors} />
-            <ListCard title="重点概念" items={currentOutput.focus_concept_sectors} />
-            <ListCard title="规避方向" items={currentOutput.avoid_sectors} />
-            <ListCard title="宏观主题" items={currentOutput.macro_themes} />
-          </div>
-
-          <ListCard title="风险因子" items={currentOutput.risk_factors} />
-
-          <Card className="rounded-none py-0">
-            <CardHeader className="px-4 pt-4 pb-0">
-              <CardTitle className="text-base text-slate-900">宏观摘要</CardTitle>
-            </CardHeader>
-            <CardContent className="px-4 pt-3 pb-4 text-sm leading-6 text-slate-700">{currentOutput.macro_summary}</CardContent>
-          </Card>
+      <Card className="rounded-none py-0">
+        <CardHeader className="px-4 pt-4 pb-0">
+          <CardTitle className="text-base text-slate-900">行业影响</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 px-4 pt-3 pb-4">
+          {sectorEntries.map(([sector, impact]) => (
+            <div key={sector} className="border border-slate-200 p-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-slate-900">{sector}</p>
+                <p className="text-xs text-slate-500">
+                  {impact.sentiment} · confidence {impact.confidence}
+                </p>
+              </div>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-700">
+                {impact.reason.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
         </>
       ) : null}
     </section>
+  );
+}
+
+function SignalCard({ title, value }: { title: string; value: string }) {
+  return (
+    <Card className="rounded-none py-0">
+      <CardHeader className="px-4 pt-4 pb-0">
+        <CardTitle className="text-sm text-slate-900">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="px-4 pt-2 pb-4 text-sm text-slate-700">{value}</CardContent>
+    </Card>
   );
 }
 
@@ -172,32 +207,4 @@ function dateToCompactDateString(date: Date) {
   const month = `${date.getMonth() + 1}`.padStart(2, "0");
   const day = `${date.getDate()}`.padStart(2, "0");
   return `${year}${month}${day}`;
-}
-
-function InfoCard({ title, value }: { title: string; value: string }) {
-  return (
-    <Card className="rounded-none py-0">
-      <CardHeader className="px-4 pt-4 pb-0">
-        <CardTitle className="text-sm text-slate-900">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="px-4 pt-2 pb-4 text-sm font-medium text-slate-700">{value}</CardContent>
-    </Card>
-  );
-}
-
-function ListCard({ title, items }: { title: string; items: string[] }) {
-  return (
-    <Card className="rounded-none py-0">
-      <CardHeader className="px-4 pt-4 pb-0">
-        <CardTitle className="text-base text-slate-900">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="px-4 pt-3 pb-4">
-        <ul className="space-y-1 text-sm leading-6 text-slate-700">
-          {items.map((item) => (
-            <li key={item}>- {item}</li>
-          ))}
-        </ul>
-      </CardContent>
-    </Card>
-  );
 }

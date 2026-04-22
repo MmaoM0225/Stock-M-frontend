@@ -205,6 +205,73 @@ export type PageResult<T> = {
 - `/stock-pool/{trade_date}` -> `/data/stock/stock-pool-manager`
 - `/portfolio/{trade_date}` -> `/data/decision/portfolio-decision`
 
+### 5.1.1 宏观经理（Macro Manager）
+
+#### 5.1.1.1 获取可选日期
+
+- **URL**：`/api/v1/data/macro/dates`
+- **用途**：`/data/macro` 页面日期选择
+- **请求参数**：无
+- **请求示例**：`GET /api/v1/data/macro/dates`
+
+`data` 结构：
+
+```json
+{
+  "dates": ["20260422", "20260421", "20260420"]
+}
+```
+
+字段说明：
+
+- `dates`：可选交易日列表（降序，最新日期在前）
+
+数据来源与规则：
+
+- 数据目录：`data/artifacts/manager/macro_manager`
+- 仅返回包含 `result.json` 的日期目录
+- 日期格式：`YYYYMMDD`
+
+#### 5.1.1.2 获取指定日期宏观经理结果
+
+- **URL**：`/api/v1/data/macro/{trade_date}`
+- **用途**：渲染市场方向、仓位建议、重点方向、风险因子与宏观摘要
+
+路径参数：
+
+- `trade_date`：交易日，格式 `YYYYMMDD`
+
+`data` 结构：
+
+```json
+{
+  "trade_date": "20260422",
+  "market_regime": "流动性偏宽松，增长弱修复，市场情绪偏悲观。",
+  "market_direction": "neutral-bearish",
+  "target_position": "30%-45%",
+  "focus_industry_sectors": ["贵金属", "有色金属"],
+  "focus_concept_sectors": ["避险资产", "资源品"],
+  "avoid_sectors": ["地产链", "可选消费"],
+  "macro_themes": ["风险偏好回落", "防御配置优先"],
+  "risk_factors": ["制造业景气偏弱", "需求修复不及预期"],
+  "confidence": 0.55,
+  "macro_summary": "市场延续弱势震荡，策略以防御与结构性机会为主。"
+}
+```
+
+字段说明：
+
+- `market_regime`：市场状态描述
+- `market_direction`：市场方向判断
+- `target_position`：建议仓位区间
+- `focus_industry_sectors`：重点行业列表
+- `focus_concept_sectors`：重点概念列表
+- `avoid_sectors`：规避方向列表
+- `macro_themes`：宏观主题列表
+- `risk_factors`：风险因子列表
+- `confidence`：置信度（`0~1`）
+- `macro_summary`：宏观摘要
+
 ## 5.2 Stock
 
 - `/stock/{ts_code}/{trade_date}` -> `/data/stock/stock-manager`
@@ -226,6 +293,7 @@ export type PageResult<T> = {
 - **URL**：`/api/v1/data/analyst/macro/economist/dates`
 - **用途**：`/data/macro/macro-economist` 页面日期下拉框
 - **请求参数**：无
+- **请求示例**：`GET /api/v1/data/analyst/macro/economist/dates`
 
 `data` 结构：
 
@@ -237,7 +305,13 @@ export type PageResult<T> = {
 
 字段说明：
 
-- `dates`：可查询交易日列表（倒序）
+- `dates`：可选交易日列表（降序，最新日期在前）
+
+数据来源与规则：
+
+- 数据目录：`data/artifacts/analyst/macro_analyst/macro_economist`
+- 仅返回包含 `result.json` 的日期目录
+- 日期格式：`YYYYMMDD`
 
 #### 5.4.2 获取指定日期宏观经济分析结果
 
@@ -311,7 +385,298 @@ export type PageResult<T> = {
   - `liquidity_summary`：流动性摘要
   - `conclusion`：综合结论
 
-### 5.5 示例：股票池查询
+### 5.5 市场情绪分析师（Market Sentiment Analyst）
+
+#### 5.5.1 获取可选日期
+
+- **URL**：`/api/v1/data/analyst/macro/market-sentiment/dates`
+- **用途**：`/data/macro/market-sentiment-analyst` 页面日期选择
+- **请求参数**：无
+- **请求示例**：`GET /api/v1/data/analyst/macro/market-sentiment/dates`
+
+`data` 结构：
+
+```json
+{
+  "dates": ["20260421", "20260420", "20260419"]
+}
+```
+
+字段说明：
+
+- `dates`：可选交易日列表（降序，最新日期在前）
+
+数据来源与规则：
+
+- 数据目录：`data/artifacts/analyst/macro_analyst/market_sentiment_analyst`
+- 仅返回包含 `result.json` 的日期目录
+- 日期格式：`YYYYMMDD`
+
+#### 5.5.2 获取指定日期市场情绪分析结果
+
+- **URL**：`/api/v1/data/analyst/macro/market-sentiment/{trade_date}`
+- **用途**：渲染信号卡、指数列表与综合情绪摘要
+
+路径参数：
+
+- `trade_date`：交易日，格式 `YYYYMMDD`
+
+`data` 结构：
+
+```json
+{
+  "trade_date": "20260421",
+  "index_items": [
+    {
+      "code": "000001.SH",
+      "name": "上证综指",
+      "index_trend": "down",
+      "turnover_summary": "近期成交量整体平稳...",
+      "volatility_summary": "近期波动率有所放大...",
+      "market_conclusion": "市场情绪偏空且脆弱...",
+      "start_price": 3030,
+      "end_price": 2878,
+      "start_volume": 255,
+      "end_volume": 270,
+      "market_series": [
+        {
+          "date": "2026-02-01",
+          "open": 3021.3,
+          "high": 3040.5,
+          "low": 3002.1,
+          "close": 3033.7,
+          "volume": 268.5
+        }
+      ]
+    }
+  ],
+  "sentiment_output": {
+    "index_trend": "down",
+    "market_sentiment": "bearish",
+    "volume_signal": "contracting",
+    "volatility_signal": "high",
+    "sentiment_summary": "市场整体情绪极度悲观..."
+  }
+}
+```
+
+字段说明：
+
+- `trade_date`：当前数据交易日
+- `index_items`：指数维度分析列表
+  - `code`：指数代码
+  - `name`：指数名称
+  - `index_trend`：指数趋势（`up/down/neutral`）
+  - `turnover_summary`：成交量解读
+  - `volatility_summary`：波动率解读
+  - `market_conclusion`：该指数市场结论
+  - `start_price/end_price`：窗口起止价格
+  - `start_volume/end_volume`：窗口起止成交量
+  - `market_series`：行情序列（用于 K 线与成交量图）
+    - `date`：交易日，格式 `YYYY-MM-DD`
+    - `open/high/low/close`：当日 OHLC
+    - `volume`：当日成交量
+- `sentiment_output`：综合情绪输出
+  - `index_trend`：指数总体趋势
+  - `market_sentiment`：市场情绪
+  - `volume_signal`：成交量信号
+  - `volatility_signal`：波动率信号
+  - `sentiment_summary`：综合情绪摘要
+
+补充约定：
+
+- `market_series` 建议默认返回最近 `60` 个交易日（与页面默认窗口一致）
+- `volume` 请固定单位（建议 `亿`），避免前后端展示口径不一致
+
+### 5.6 宏观新闻分析师（News Analyst）
+
+#### 5.6.1 获取可选日期
+
+- **URL**：`/api/v1/data/analyst/macro/news/dates`
+- **用途**：`/data/macro/news-analyst` 页面日期选择
+- **请求参数**：无
+- **请求示例**：`GET /api/v1/data/analyst/macro/news/dates`
+
+`data` 结构：
+
+```json
+{
+  "dates": ["20260422", "20260421", "20260420"]
+}
+```
+
+字段说明：
+
+- `dates`：可选交易日列表（降序，最新日期在前）
+
+数据来源与规则：
+
+- 数据目录：`data/artifacts/analyst/macro_analyst/news_analyst`
+- 仅返回包含 `result.json` 的日期目录
+- 日期格式：`YYYYMMDD`
+
+#### 5.6.2 获取指定日期新闻分析结果
+
+- **URL**：`/api/v1/data/analyst/macro/news/{trade_date}`
+- **用途**：渲染宏观环境信号卡、新闻事件列表、行业影响分析
+
+路径参数：
+
+- `trade_date`：交易日，格式 `YYYYMMDD`
+
+`data` 结构：
+
+```json
+{
+  "date": "20260422",
+  "events": [
+    {
+      "source": "Bloomberg",
+      "type": "company",
+      "summary": "宁德时代发布6分钟快充电池新技术。",
+      "industry": ["电池", "汽车零部件"],
+      "sentiment": "positive",
+      "impact_level": 4
+    }
+  ],
+  "sector_impacts": {
+    "电池": {
+      "sentiment": "bullish",
+      "confidence": 0.85,
+      "reason": ["技术创新强化行业景气预期。"]
+    }
+  },
+  "macro_environment": {
+    "liquidity": "neutral",
+    "policy_bias": "neutral",
+    "global_risk": "high",
+    "market_sentiment": "neutral"
+  }
+}
+```
+
+字段说明：
+
+- `date`：当前数据交易日（`YYYYMMDD`）
+- `events`：新闻事件列表
+  - `source`：新闻来源
+  - `type`：事件类型（如 `company/geopolitics/industry/market/other`）
+  - `summary`：事件摘要
+  - `industry`：影响行业列表
+  - `sentiment`：事件情绪（`positive/neutral/negative`）
+  - `impact_level`：影响等级（建议 `1~5`）
+- `sector_impacts`：行业影响映射（key 为行业名）
+  - `sentiment`：行业情绪（`bullish/neutral/bearish`）
+  - `confidence`：置信度（`0~1`）
+  - `reason`：判断理由列表
+- `macro_environment`：宏观环境快照
+  - `liquidity`：流动性
+  - `policy_bias`：政策倾向
+  - `global_risk`：全球风险
+  - `market_sentiment`：市场情绪
+
+### 5.7 大宗商品分析师（Commodity Analyst）
+
+#### 5.7.1 获取可选日期
+
+- **URL**：`/api/v1/data/analyst/macro/commodity/dates`
+- **用途**：`/data/macro/commodity-analyst` 页面日期选择
+- **请求参数**：无
+- **请求示例**：`GET /api/v1/data/analyst/macro/commodity/dates`
+
+`data` 结构：
+
+```json
+{
+  "dates": ["20260421", "20260420", "20260419"]
+}
+```
+
+字段说明：
+
+- `dates`：可选交易日列表（降序，最新日期在前）
+
+数据来源与规则：
+
+- 数据目录：`data/artifacts/analyst/macro_analyst/commodity_analyst`
+- 仅返回包含 `result.json` 的日期目录
+- 日期格式：`YYYYMMDD`
+
+#### 5.7.2 获取指定日期大宗商品分析结果
+
+- **URL**：`/api/v1/data/analyst/macro/commodity/{trade_date}`
+- **用途**：渲染商品卡片、K 线/成交量与综合输出
+
+路径参数：
+
+- `trade_date`：交易日，格式 `YYYYMMDD`
+
+`data` 结构：
+
+```json
+{
+  "trade_date": "20260421",
+  "commodity_items": [
+    {
+      "name": "黄金",
+      "trend": "up",
+      "start": 467.73,
+      "end": 479.0,
+      "price_summary": "价格从...整体涨幅约2.4%",
+      "macro_implication": "黄金作为避险资产...",
+      "market_series": [
+        {
+          "date": "2026-02-01",
+          "open": 466.2,
+          "high": 469.3,
+          "low": 464.8,
+          "close": 468.9,
+          "volume": 32.4
+        }
+      ]
+    }
+  ],
+  "output_summary": {
+    "overall_trend": "down",
+    "commodity_market_trend": "mixed",
+    "macro_signals": {
+      "growth_signal": "weakening",
+      "inflation_signal": "falling",
+      "risk_sentiment": "risk_off"
+    },
+    "macro_summary": "经济增长动能减弱，通胀压力下降，市场避险情绪上升。"
+  }
+}
+```
+
+字段说明：
+
+- `trade_date`：当前数据交易日
+- `commodity_items`：商品分析列表
+  - `name`：商品名称
+  - `trend`：趋势（`up/down/neutral`）
+  - `start/end`：窗口起止价格
+  - `price_summary`：价格行为解读
+  - `macro_implication`：宏观含义解读
+  - `market_series`：行情序列（用于 K 线与成交量图）
+    - `date`：交易日，格式 `YYYY-MM-DD`
+    - `open/high/low/close`：当日 OHLC
+    - `volume`：当日成交量
+- `output_summary`：综合输出
+  - `overall_trend`：总体趋势
+  - `commodity_market_trend`：商品市场趋势
+  - `macro_signals`：宏观信号汇总
+    - `growth_signal`：增长信号
+    - `inflation_signal`：通胀信号
+    - `risk_sentiment`：风险偏好
+  - `macro_summary`：综合摘要
+
+补充约定：
+
+- `market_series` 建议默认返回最近 `60` 个交易日
+- `volume` 请固定单位（建议 `亿`）
+
+### 5.8 示例：股票池查询
 
 - **URL**：`GET /api/v1/data/stock-pool/20260422`
 
@@ -425,8 +790,6 @@ export type PageResult<T> = {
 ## 8. 非必需接口（可后置）
 
 当前页面未直接消费，后端可延后：
-
-- `/api/v1/data/analyst/macro/news/{trade_date}`
 - `/api/v1/portfolio/compare`
 - `/api/v1/portfolio/performance`
 
@@ -439,3 +802,4 @@ export type PageResult<T> = {
 - 空数据时是否返回空数组而非 `null`
 - 分页接口是否返回 `page/page_size/total/items`
 - 数值字段类型是否稳定（不要字符串数字混用）
+

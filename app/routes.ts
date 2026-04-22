@@ -6,6 +6,7 @@ export default [
   route("data", "routes/data.tsx", [
     route("macro/macro-economist", "routes/data/macro/macro-economist.tsx"),
     route("macro/commodity-analyst", "routes/data/macro/commodity-analyst.tsx"),
+    route("macro/news-analyst", "routes/data/macro/news-analyst.tsx"),
     route(
       "macro/market-sentiment-analyst",
       "routes/data/macro/market-sentiment-analyst.tsx"
