@@ -11,6 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import type { MetricChartProps } from "~/types/data/macro";
 
 const macroDataByDate = {
   "2026-04-21": {
@@ -220,15 +221,6 @@ export default function MacroEconomistPage() {
     </section>
   );
 }
-
-type MetricChartProps = {
-  title: string;
-  data: Array<Record<string, number | string>>;
-  dataKey: string;
-  stroke?: string;
-  fill?: string;
-  xKey?: string;
-};
 
 function MetricLineCard({ title, data, dataKey, stroke = "#2563eb", xKey = "month" }: MetricChartProps) {
   return (

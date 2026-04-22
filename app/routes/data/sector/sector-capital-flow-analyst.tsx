@@ -12,20 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-
-type SectorFlowPoint = {
-  name: string;
-  netAmount: number;
-};
-
-type SectorDailyRow = {
-  tradeDate: string;
-  tsCode: string;
-  name: string;
-  leadStock: string;
-  pctChange: number;
-  netAmount: number;
-};
+import type { SectorDailyRow, SectorFlowPoint } from "~/types/data/sector";
 
 const sectorAgentOutputByDate = {
   "2025-03-20": {

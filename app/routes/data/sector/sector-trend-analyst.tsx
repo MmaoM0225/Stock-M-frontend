@@ -3,33 +3,7 @@ import type { UTCTimestamp } from "lightweight-charts";
 import { KLineVolumeChart, type KLinePoint } from "~/components/charts/kline-volume-chart";
 import { Badge } from "~/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-
-type SectorTrendOutput = {
-  summary: string;
-  conclusion: string;
-  leadingThemes: string[];
-  reversalOpportunities: string[];
-  topRiskSectors: string[];
-  highlights: string[];
-  marketRegime: "mixed" | "trend" | "risk-off";
-};
-
-type SectorKLineRow = {
-  tsCode: string;
-  tradeDate: string;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  pctChange: number;
-  vol: number;
-};
-
-type SectorSeries = {
-  tsCode: string;
-  name: string;
-  rows: SectorKLineRow[];
-};
+import type { SectorKLineRow, SectorSeries, SectorTrendOutput } from "~/types/data/sector";
 
 const trendOutputByDate: Record<string, SectorTrendOutput> = {
   "2025-03-20": {

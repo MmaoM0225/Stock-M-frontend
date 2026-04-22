@@ -4,9 +4,12 @@ import {
   createChart,
   ColorType,
   HistogramSeries,
+  LineSeries,
+  LineStyle,
   type IChartApi,
   type CandlestickData,
   type HistogramData,
+  type LineData,
   type UTCTimestamp,
 } from "lightweight-charts";
 
@@ -19,11 +22,37 @@ export type KLinePoint = {
   volume: number;
 };
 
-export function KLineVolumeChart({ data, height = 320 }: { data: KLinePoint[]; height?: number }) {
+export type KLineOverlayLine = {
+  name?: string;
+  color: string;
+  lineWidth?: number;
+  data: { time: UTCTimestamp; value: number }[];
+};
+
+export type KLineOverlayLevel = {
+  title: string;
+  value: number;
+  color: string;
+  lineStyle?: "solid" | "dashed" | "dotted";
+};
+
+export function KLineVolumeChart({
+  data,
+  height = 320,
+  overlayLines = [],
+  overlayLevels = [],
+}: {
+  data: KLinePoint[];
+  height?: number;
+  overlayLines?: KLineOverlayLine[];
+  overlayLevels?: KLineOverlayLevel[];
+}) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleRef = useRef<any>(null);
   const volumeRef = useRef<any>(null);
+  const overlaySeriesRef = useRef<any[]>([]);
+  const priceLinesRef = useRef<any[]>([]);
 
   useEffect(() => {
     if (!containerRef.current || chartRef.current) return;
@@ -88,6 +117,8 @@ export function KLineVolumeChart({ data, height = 320 }: { data: KLinePoint[]; h
       chartRef.current = null;
       candleRef.current = null;
       volumeRef.current = null;
+      overlaySeriesRef.current = [];
+      priceLinesRef.current = [];
     };
   }, [height]);
 
@@ -108,8 +139,46 @@ export function KLineVolumeChart({ data, height = 320 }: { data: KLinePoint[]; h
 
     candleRef.current.setData(candleData);
     volumeRef.current.setData(volumeData);
+
+    overlaySeriesRef.current.forEach((series) => {
+      chartRef.current?.removeSeries(series);
+    });
+    overlaySeriesRef.current = [];
+    overlayLines.forEach((line) => {
+      const lineSeries = chartRef.current?.addSeries(LineSeries, {
+        color: line.color,
+        lineWidth: line.lineWidth ?? 2,
+        priceLineVisible: false,
+        lastValueVisible: true,
+        title: line.name,
+      });
+      if (!lineSeries) return;
+      const lineData: LineData[] = line.data.map((point) => ({ time: point.time, value: point.value }));
+      lineSeries.setData(lineData);
+      overlaySeriesRef.current.push(lineSeries);
+    });
+
+    priceLinesRef.current.forEach((priceLine) => {
+      candleRef.current.removePriceLine(priceLine);
+    });
+    priceLinesRef.current = overlayLevels.map((level) =>
+      candleRef.current.createPriceLine({
+        price: level.value,
+        color: level.color,
+        lineWidth: 2,
+        lineStyle:
+          level.lineStyle === "solid"
+            ? LineStyle.Solid
+            : level.lineStyle === "dotted"
+              ? LineStyle.Dotted
+              : LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: level.title,
+      })
+    );
+
     chartRef.current.timeScale().fitContent();
-  }, [data]);
+  }, [data, overlayLines, overlayLevels]);
 
   return <div ref={containerRef} className="w-full" />;
 }
