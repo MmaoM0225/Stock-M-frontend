@@ -23,11 +23,6 @@ export const agentList: AgentGroupItem[] = [
         to: "/agents/macro/macro-economist",
       },
       {
-        title: "流动性分析师（Liquidity Analyst）",
-        desc: "追踪货币投放、利率中枢、信用扩张与市场资金面变化，识别“宽松/收紧”切换信号，评估风险偏好和估值弹性，为仓位节奏与风格选择提供依据。",
-        to: "/agents/macro/liquidity-analyst",
-      },
-      {
         title: "大宗商品分析师（Commodity Analyst）",
         desc: "覆盖能源、金属与农产品等关键品类，结合供需结构、库存周期与价格传导，判断上游成本与通胀压力方向，辅助行业景气与盈利预期修正。",
         to: "/agents/macro/commodity-analyst",

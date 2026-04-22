@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { useRequest } from "~/hooks/use-request";
 
 type AgentOption = {
   label: string;
@@ -38,7 +38,6 @@ const AGENT_OPTIONS: AgentOption[] = [
   { label: "宏观经济分析师", endpoint: "/api/v1/agents/analyst/macro/economist/run", method: "POST" },
   { label: "宏观新闻分析师", endpoint: "/api/v1/agents/analyst/macro/news/run", method: "POST" },
   { label: "市场情绪分析师", endpoint: "/api/v1/agents/analyst/macro/market-sentiment/run", method: "POST" },
-  { label: "流动性分析师", endpoint: "/api/v1/agents/analyst/macro/liquidity/run", method: "POST" },
   { label: "大宗商品分析师", endpoint: "/api/v1/agents/analyst/macro/commodity/run", method: "POST" },
 ];
 
@@ -51,30 +50,46 @@ export default function AgentsPage() {
   const [tsCode, setTsCode] = useState("600519.SH");
   const [force, setForce] = useState(false);
   const [initialCapital, setInitialCapital] = useState("500000");
-  const [isRunning, setIsRunning] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [result, setResult] = useState<RunResult | null>(null);
+  const [validationError, setValidationError] = useState("");
 
   const selectedAgent = useMemo(
     () => AGENT_OPTIONS.find((item) => item.endpoint === selectedEndpoint) ?? AGENT_OPTIONS[0],
     [selectedEndpoint]
   );
+  const resolvedEndpoint = useMemo(
+    () => selectedAgent?.endpoint.replace("{ts_code}", encodeURIComponent(tsCode.trim())) ?? "",
+    [selectedAgent, tsCode]
+  );
+  const {
+    data: result,
+    error: errorMessage,
+    loading: isRunning,
+    execute,
+    reset,
+  } = useRequest<RunResult, Record<string, unknown>>({
+    url: resolvedEndpoint,
+    method: selectedAgent?.method ?? "POST",
+  });
+  const displayError = validationError || errorMessage;
   const isRunDisabled = true;
 
   async function handleRun() {
     if (!selectedAgent) return;
     if (!tradeDate) {
-      setErrorMessage("请先选择交易日。");
+      setValidationError("请先选择交易日。");
+      return;
+    }
+    if (!resolvedEndpoint) {
+      setValidationError("当前 Agent 接口无效。");
       return;
     }
     if (selectedAgent.needsStockCode && !tsCode.trim()) {
-      setErrorMessage("该 Agent 需要股票代码（ts_code）。");
+      setValidationError("该 Agent 需要股票代码（ts_code）。");
       return;
     }
 
-    setIsRunning(true);
-    setErrorMessage("");
-    setResult(null);
+    setValidationError("");
+    reset();
 
     try {
       const apiTradeDate = toApiDate(tradeDate);
@@ -93,25 +108,9 @@ export default function AgentsPage() {
         payload.skip_existing = !force;
       }
 
-      const resolvedEndpoint = selectedAgent.endpoint.replace("{ts_code}", encodeURIComponent(tsCode.trim()));
-      const response = await fetch(resolvedEndpoint, {
-        method: selectedAgent.method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const json = (await response.json()) as RunResult;
-      if (!response.ok) {
-        throw new Error(json?.message || `请求失败：${response.status}`);
-      }
-      setResult(json);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "运行失败，请稍后重试。";
-      setErrorMessage(message);
-    } finally {
-      setIsRunning(false);
+      await execute(payload);
+    } catch {
+      // error message is handled in useRequest
     }
   }
 
@@ -221,8 +220,8 @@ export default function AgentsPage() {
           </CardContent>
         </Card>
 
-        {errorMessage ? (
-          <div className="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{errorMessage}</div>
+        {displayError ? (
+          <div className="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{displayError}</div>
         ) : null}
 
         {result ? (
