@@ -11,6 +11,14 @@ export default [
       "routes/data/market-sentiment-analyst.tsx"
     ),
     route("macro", "routes/data/macro.tsx"),
+    route(
+      "sector/sector-capital-flow-analyst",
+      "routes/data/sector/sector-capital-flow-analyst.tsx"
+    ),
+    route(
+      "sector/sector-trend-analyst",
+      "routes/data/sector/sector-trend-analyst.tsx"
+    ),
     route("sector", "routes/data/sector.tsx"),
     route("screener", "routes/data/screener.tsx"),
     route("stock-pool", "routes/data/stock-pool.tsx"),
