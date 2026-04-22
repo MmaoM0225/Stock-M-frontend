@@ -30,9 +30,12 @@ export default function DataPage() {
         >
           <SidebarHeader className="border-b border-sidebar-border px-2 py-3">
             <h2 className="px-2 text-sm font-semibold tracking-wide">Data</h2>
-            <p className="px-2 text-xs text-sidebar-foreground/70">
-              数据查询与可视化
-            </p>
+            <div className="px-2">
+              <p className="text-xs text-sidebar-foreground/70">数据查询与可视化</p>
+              <Link to="/agents" className="mt-2 inline-block text-xs font-medium underline-offset-4 hover:underline">
+                前往 Agent 运行页
+              </Link>
+            </div>
           </SidebarHeader>
           <SidebarContent>
             {agentList.map((group) => (

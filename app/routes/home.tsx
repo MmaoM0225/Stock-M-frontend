@@ -35,54 +35,63 @@ export default function Home() {
       output: "经济动能温和修复，流动性中性偏松，建议仓位 65%-75%。",
       signal: "中性偏多",
       updatedAt: "2026-04-21 09:05",
+      to: "/data/macro",
     },
     {
       agent: "行业经理（Sector Manager）",
       output: "资金延续向 AI 应用与高股息切换，关注景气修复与防御平衡。",
       signal: "结构轮动",
       updatedAt: "2026-04-21 09:08",
+      to: "/data/sector",
     },
     {
       agent: "stock_pool_manager（批量个股池经理）",
       output: "候选池 42 只，Top10 综合分集中在算力链与现金流稳健龙头。",
       signal: "优选清单已更新",
       updatedAt: "2026-04-21 09:12",
+      to: "/data/stock/stock-pool-manager",
     },
     {
       agent: "portfolio_decision（组合决策引擎）",
       output: "建议加仓 3 只、减仓 2 只，组合集中度维持在风控阈值内。",
       signal: "可执行",
       updatedAt: "2026-04-21 09:15",
+      to: "/data/decision/portfolio-decision",
     },
     {
       agent: "宏观经济分析师（Macro Economist）",
       output: "增长修复延续但斜率放缓，通胀温和，政策维持稳增长取向。",
       signal: "温和复苏",
       updatedAt: "2026-04-21 09:18",
+      to: "/data/macro/macro-economist",
     },
     {
       agent: "流动性分析师（Liquidity Analyst）",
       output: "短端利率稳定，信用扩张边际改善，权益估值压制缓解。",
       signal: "中性偏松",
       updatedAt: "2026-04-21 09:20",
+      to: "/data/macro/liquidity-analyst",
     },
     {
       agent: "行业趋势分析师（Sector Trend Analyst）",
       output: "算力基础设施与高分红延续强趋势，消费修复处在早期阶段。",
       signal: "主线清晰",
       updatedAt: "2026-04-21 09:22",
+      to: "/data/sector/sector-trend-analyst",
     },
     {
       agent: "板块资金流分析师（Sector Capital Flow Analyst）",
       output: "近 5 日资金净流入集中在 AI 应用链，医药出现边际回流信号。",
       signal: "资金聚焦",
       updatedAt: "2026-04-21 09:24",
+      to: "/data/sector/sector-capital-flow-analyst",
     },
     {
       agent: "stock_manager（个股研究经理）",
       output: "单票研究完成率 96%，高分标的集中于盈利确定性与现金流改善方向。",
       signal: "研究完成",
       updatedAt: "2026-04-21 09:26",
+      to: "/data/stock/stock-manager",
     },
   ];
   const [currentPage, setCurrentPage] = useState(1);
@@ -162,7 +171,7 @@ export default function Home() {
                   <div className="mt-4 grid gap-3 md:grid-cols-2">
                     {agent.cards.map((card) => (
                       <Card key={card.title} className="rounded-none py-0 transition-colors hover:bg-slate-50">
-                        <Link to={card.to} className="block">
+                        <Link to="/agents" className="block">
                           <CardHeader className="px-4 pt-4 pb-0">
                             <CardTitle className="text-sm text-slate-900">{card.title}</CardTitle>
                           </CardHeader>
@@ -177,7 +186,7 @@ export default function Home() {
               ) : (
                 <Link
                   key={agent.name}
-                  to={agent.to}
+                  to="/agents"
                   className="block py-4 first:pt-0 last:pb-0"
                 >
                   <h3 className="text-base font-semibold text-slate-900">{agent.name}</h3>
@@ -204,17 +213,19 @@ export default function Home() {
           </div>
           <div className="mt-5 grid gap-3 md:grid-cols-2">
             {currentItems.map((item) => (
-              <Card key={item.agent} className="rounded-none py-0">
-                <CardHeader className="px-4 pt-4 pb-0">
-                  <div className="flex items-start justify-between gap-3">
-                    <CardTitle className="text-sm text-slate-900">{item.agent}</CardTitle>
-                    <span className="shrink-0 text-xs text-emerald-700">{item.signal}</span>
-                  </div>
-                </CardHeader>
-                <CardContent className="px-4 pt-2 pb-4">
-                  <p className="text-sm leading-6 text-slate-600">{item.output}</p>
-                  <p className="mt-3 text-xs text-slate-400">更新时间：{item.updatedAt}</p>
-                </CardContent>
+              <Card key={item.agent} className="rounded-none py-0 transition-colors hover:bg-slate-50">
+                <Link to={item.to} className="block">
+                  <CardHeader className="px-4 pt-4 pb-0">
+                    <div className="flex items-start justify-between gap-3">
+                      <CardTitle className="text-sm text-slate-900">{item.agent}</CardTitle>
+                      <span className="shrink-0 text-xs text-emerald-700">{item.signal}</span>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="px-4 pt-2 pb-4">
+                    <p className="text-sm leading-6 text-slate-600">{item.output}</p>
+                    <p className="mt-3 text-xs text-slate-400">更新时间：{item.updatedAt}</p>
+                  </CardContent>
+                </Link>
               </Card>
             ))}
           </div>
