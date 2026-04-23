@@ -1,8 +1,17 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { UTCTimestamp } from "lightweight-charts";
+import { Button } from "~/components/ui/button";
+import { Calendar } from "~/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { KLineVolumeChart, type KLinePoint } from "~/components/charts/kline-volume-chart";
+import { Popover, PopoverContent, PopoverTrigger } from "~/components/ui/popover";
 import type { TechnicalData } from "~/types/data/stock";
+import {
+  getTechnicalByCodeAndDate,
+  getTechnicalDatesByCode,
+  getTechnicalTsCodes,
+  type TechnicalData as TechnicalApiData,
+} from "~/lib/stock";
 
 const baseTechnicalData: TechnicalData = {
   tsCode: "000060.SZ",
@@ -118,42 +127,142 @@ const technicalByDateAndStock: Record<string, Record<string, TechnicalData>> = {
 };
 
 export default function StockTechnicalAnalystPage() {
-  const dateOptions = Object.keys(technicalByDateAndStock).sort((a, b) => (a > b ? -1 : 1));
-  const [selectedDate, setSelectedDate] = useState(dateOptions[0] ?? "");
-  const stockOptions = useMemo(() => Object.keys(technicalByDateAndStock[selectedDate] ?? {}), [selectedDate]);
-  const [selectedStock, setSelectedStock] = useState(stockOptions[0] ?? "");
-  const activeStock = stockOptions.includes(selectedStock) ? selectedStock : stockOptions[0];
-  const current = technicalByDateAndStock[selectedDate]?.[activeStock] ?? baseTechnicalData;
+  const [stockOptions, setStockOptions] = useState<string[]>([]);
+  const [dateOptions, setDateOptions] = useState<string[]>([]);
+  const [selectedStock, setSelectedStock] = useState("");
+  const [selectedDate, setSelectedDate] = useState("");
+  const [current, setCurrent] = useState<TechnicalApiData | null>(null);
+  const [loadingStocks, setLoadingStocks] = useState(false);
+  const [loadingDates, setLoadingDates] = useState(false);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [error, setError] = useState("");
+  const availableDateSet = useMemo(() => new Set(dateOptions), [dateOptions]);
+  const selectedCalendarDate = useMemo(
+    () => (selectedDate ? compactDateStringToDate(selectedDate) : undefined),
+    [selectedDate]
+  );
+
+  useEffect(() => {
+    let disposed = false;
+    const loadStocks = async () => {
+      setLoadingStocks(true);
+      setError("");
+      try {
+        const response = await getTechnicalTsCodes();
+        if (disposed) return;
+        const codes = response.data?.ts_codes ?? [];
+        setStockOptions(codes);
+        setSelectedStock(codes[0] ?? "");
+      } catch (err) {
+        if (disposed) return;
+        setError(err instanceof Error ? err.message : "获取股票列表失败");
+      } finally {
+        if (!disposed) setLoadingStocks(false);
+      }
+    };
+
+    loadStocks();
+    return () => {
+      disposed = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedStock) {
+      setDateOptions([]);
+      setSelectedDate("");
+      return;
+    }
+
+    let disposed = false;
+    const loadDates = async () => {
+      setLoadingDates(true);
+      setError("");
+      try {
+        const response = await getTechnicalDatesByCode(selectedStock);
+        if (disposed) return;
+        const dates = response.data?.dates ?? [];
+        setDateOptions(dates);
+        setSelectedDate((prev) => (dates.includes(prev) ? prev : dates[0] ?? ""));
+      } catch (err) {
+        if (disposed) return;
+        setDateOptions([]);
+        setSelectedDate("");
+        setError(err instanceof Error ? err.message : "获取日期列表失败");
+      } finally {
+        if (!disposed) setLoadingDates(false);
+      }
+    };
+
+    loadDates();
+    return () => {
+      disposed = true;
+    };
+  }, [selectedStock]);
+
+  useEffect(() => {
+    if (!selectedStock || !selectedDate) {
+      setCurrent(null);
+      return;
+    }
+
+    let disposed = false;
+    const loadDetail = async () => {
+      setLoadingDetail(true);
+      setError("");
+      try {
+        const response = await getTechnicalByCodeAndDate(selectedStock, selectedDate);
+        if (disposed) return;
+        setCurrent(response.data ?? null);
+      } catch (err) {
+        if (disposed) return;
+        setCurrent(null);
+        setError(err instanceof Error ? err.message : "获取技术面详情失败");
+      } finally {
+        if (!disposed) setLoadingDetail(false);
+      }
+    };
+
+    loadDetail();
+    return () => {
+      disposed = true;
+    };
+  }, [selectedStock, selectedDate]);
+
+  const currentSupportLevels = current?.support_levels ?? [];
+  const currentResistanceLevels = current?.resistance_levels ?? [];
+  const currentIndicators = current?.indicators ?? {};
+  const currentKlineRows = current?.stock_kline_data ?? [];
 
   const klineData: KLinePoint[] = useMemo(
     () =>
-      current.stockKlineData.map((item) => ({
-        time: toUtcTimestamp(item.tradeDate),
+      currentKlineRows.map((item) => ({
+        time: toUtcTimestamp(item.trade_date),
         open: item.open,
         high: item.high,
         low: item.low,
         close: item.close,
         volume: item.vol,
       })),
-    [current.stockKlineData]
+    [currentKlineRows]
   );
 
   const overlayLevels = useMemo(
     () => [
-      ...current.supportLevels.map((value, index) => ({
+      ...currentSupportLevels.map((value, index) => ({
         title: `S${index + 1} ${value.toFixed(2)}`,
         value,
         color: "#16a34a",
         lineStyle: "dashed" as const,
       })),
-      ...current.resistanceLevels.map((value, index) => ({
+      ...currentResistanceLevels.map((value, index) => ({
         title: `R${index + 1} ${value.toFixed(2)}`,
         value,
         color: "#dc2626",
         lineStyle: "dashed" as const,
       })),
     ],
-    [current.supportLevels, current.resistanceLevels]
+    [currentResistanceLevels, currentSupportLevels]
   );
 
   return (
@@ -161,27 +270,13 @@ export default function StockTechnicalAnalystPage() {
       <div className="border border-slate-200 bg-white p-6">
         <h1 className="text-2xl font-bold text-slate-900">个股技术面分析师（stock_technical_analyst）</h1>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          对接技术面数据，主图展示K线与成交量并标注支撑/压力位，不再拆分展示指标子图。
+          先选股票、再选该股票下有报告的日期。主图展示K线与成交量并标注支撑/压力位，不再拆分展示指标子图。
         </p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <label className="space-y-1">
-            <span className="text-xs text-slate-500">选择日期</span>
-            <select
-              value={selectedDate}
-              onChange={(event) => setSelectedDate(event.target.value)}
-              className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:border-slate-400"
-            >
-              {dateOptions.map((date) => (
-                <option key={date} value={date}>
-                  {date}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="space-y-1">
             <span className="text-xs text-slate-500">选择股票</span>
             <select
-              value={activeStock}
+              value={selectedStock}
               onChange={(event) => setSelectedStock(event.target.value)}
               className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:border-slate-400"
             >
@@ -192,24 +287,64 @@ export default function StockTechnicalAnalystPage() {
               ))}
             </select>
           </label>
+          <label className="space-y-1">
+            <span className="text-xs text-slate-500">选择日期</span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="h-9 w-full justify-start text-left font-normal">
+                  {selectedDate || "请选择"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={selectedCalendarDate}
+                  onSelect={(date) => {
+                    if (!date) return;
+                    const normalizedDate = dateToCompactDateString(date);
+                    if (availableDateSet.has(normalizedDate)) {
+                      setSelectedDate(normalizedDate);
+                    }
+                  }}
+                  disabled={(date) => !availableDateSet.has(dateToCompactDateString(date))}
+                />
+              </PopoverContent>
+            </Popover>
+          </label>
         </div>
+        {loadingStocks ? <p className="mt-3 text-sm text-slate-500">股票列表加载中...</p> : null}
+        {loadingDates ? <p className="mt-1 text-sm text-slate-500">日期列表加载中...</p> : null}
       </div>
 
+      {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+      {!loadingDetail && !current ? (
+        <Card className="rounded-none py-0">
+          <CardContent className="px-4 py-4 text-sm text-slate-500">暂无可展示的数据。</CardContent>
+        </Card>
+      ) : null}
+      {loadingDetail ? (
+        <Card className="rounded-none py-0">
+          <CardContent className="px-4 py-4 text-sm text-slate-500">数据加载中...</CardContent>
+        </Card>
+      ) : null}
+
+      {current ? (
+        <>
       <div className="grid gap-4 md:grid-cols-4">
-        <Metric title="技术评分" value={String(current.technicalScore)} />
-        <Metric title="趋势" value={`${current.trendSignal} / ${current.trendStrength}`} />
-        <Metric title="最新价格" value={current.latestPrice.toFixed(2)} />
+        <Metric title="技术评分" value={String(current.technical_score)} />
+        <Metric title="趋势" value={`${current.trend_signal} / ${current.trend_strength}`} />
+        <Metric title="最新价格" value={current.latest_price.toFixed(2)} />
         <Metric
           title="最新涨跌幅"
-          value={`${current.latestPctChg >= 0 ? "+" : ""}${current.latestPctChg.toFixed(2)}%`}
-          valueClassName={current.latestPctChg >= 0 ? "text-emerald-600" : "text-rose-600"}
+          value={`${current.latest_pct_chg >= 0 ? "+" : ""}${current.latest_pct_chg.toFixed(2)}%`}
+          valueClassName={current.latest_pct_chg >= 0 ? "text-emerald-600" : "text-rose-600"}
         />
       </div>
 
       <Card className="rounded-none py-0">
         <CardHeader className="px-4 pt-4 pb-0">
           <CardTitle className="text-base text-slate-900">
-            日线K线与成交量（已标注支撑/压力位）（{current.tsCode}，{current.startDate} - {current.tradeDate}）
+            日线K线与成交量（已标注支撑/压力位）（{current.ts_code}，{current.start_date} - {current.trade_date}）
           </CardTitle>
         </CardHeader>
         <CardContent className="px-2 pt-3 pb-4">
@@ -236,7 +371,7 @@ export default function StockTechnicalAnalystPage() {
           </CardHeader>
           <CardContent className="space-y-2 px-4 pt-3 pb-4 text-sm text-slate-700">
             <ul className="space-y-1">
-              {Object.entries(current.indicators).map(([key, value]) => (
+              {Object.entries(currentIndicators).map(([key, value]) => (
                 <li key={key}>
                   - {key.toUpperCase()}：{value}
                 </li>
@@ -252,19 +387,36 @@ export default function StockTechnicalAnalystPage() {
         </CardHeader>
         <CardContent className="space-y-2 px-4 pt-3 pb-4 text-sm text-slate-700">
           <p>{current.summary}</p>
-          <p>短期展望：{current.shortTermOutlook}</p>
-          <p>风险提示：{current.riskReminder}</p>
+          <p>短期展望：{current.short_term_outlook}</p>
+          <p>风险提示：{current.risk_reminder}</p>
         </CardContent>
       </Card>
+        </>
+      ) : null}
     </section>
   );
 }
 
-function toUtcTimestamp(yyyymmdd: string): UTCTimestamp {
-  const year = Number(yyyymmdd.slice(0, 4));
-  const month = Number(yyyymmdd.slice(4, 6)) - 1;
-  const day = Number(yyyymmdd.slice(6, 8));
+function toUtcTimestamp(rawValue: string): UTCTimestamp {
+  const digits = rawValue.replace(/\D/g, "");
+  const year = Number(digits.slice(0, 4));
+  const month = Number(digits.slice(4, 6)) - 1;
+  const day = Number(digits.slice(6, 8));
   return (Date.UTC(year, month, day) / 1000) as UTCTimestamp;
+}
+
+function compactDateStringToDate(value: string) {
+  const year = Number(value.slice(0, 4));
+  const month = Number(value.slice(4, 6));
+  const day = Number(value.slice(6, 8));
+  return new Date(year, month - 1, day, 12, 0, 0);
+}
+
+function dateToCompactDateString(date: Date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}${month}${day}`;
 }
 
 function Metric({

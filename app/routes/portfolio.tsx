@@ -1,5 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Button } from "~/components/ui/button";
+import { Calendar } from "~/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Popover, PopoverContent, PopoverTrigger } from "~/components/ui/popover";
 import {
   Bar,
   BarChart,
@@ -7,97 +10,158 @@ import {
   Cell,
   Line,
   LineChart,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
+import {
+  getPortfolioDecisionVersions,
+  getPortfolioHistoryByVersion,
+  getPortfolioSnapshotByVersionAndTradeDate,
+  getPortfolioSnapshotDatesByVersion,
+  type PortfolioHistoryPoint,
+  type PortfolioSnapshotData,
+  type PortfolioSnapshotPosition,
+} from "~/lib/stock";
 
-type Position = {
-  tsCode: string;
-  name: string;
-  industry: string;
-  weight: number;
-  shares: number;
-  costPrice: number;
-  latestPrice: number;
-};
-type OrderedPosition = Position & {
+type OrderedPosition = PortfolioSnapshotPosition & {
   rank: number;
   positionSize: number;
   displayName: string;
 };
-type IndustryDistribution = {
-  industry: string;
-  totalWeight: number;
-  displayName: string;
-};
 
-type ReturnPoint = {
-  date: string;
-  netValue: number;
-  dailyReturnPct: number;
-  drawdownPct: number;
-};
-
-const positionsByDate: Record<string, Position[]> = {
-  "2026-04-22": [
-    { tsCode: "600519.SH", name: "贵州茅台", industry: "白酒", weight: 16.2, shares: 100, costPrice: 1420.0, latestPrice: 1498.5 },
-    { tsCode: "601088.SH", name: "中国神华", industry: "煤炭", weight: 14.5, shares: 1300, costPrice: 46.45, latestPrice: 49.11 },
-    { tsCode: "600988.SH", name: "赤峰黄金", industry: "贵金属", weight: 12.9, shares: 1600, costPrice: 35.77, latestPrice: 40.3 },
-    { tsCode: "601919.SH", name: "中远海控", industry: "航运", weight: 11.7, shares: 4000, costPrice: 15.74, latestPrice: 15.77 },
-    { tsCode: "000858.SZ", name: "五粮液", industry: "白酒", weight: 9.1, shares: 400, costPrice: 102.8, latestPrice: 105.4 },
-    { tsCode: "600406.SH", name: "国电南瑞", industry: "电力设备", weight: 7.6, shares: 1400, costPrice: 28.95, latestPrice: 29.22 },
-    { tsCode: "605589.SH", name: "圣泉集团", industry: "化工", weight: 6.9, shares: 1300, costPrice: 31.9, latestPrice: 33.92 },
-  ],
-  "2026-04-15": [
-    { tsCode: "600519.SH", name: "贵州茅台", industry: "白酒", weight: 14.4, shares: 100, costPrice: 1420.0, latestPrice: 1462.0 },
-    { tsCode: "601088.SH", name: "中国神华", industry: "煤炭", weight: 13.2, shares: 1200, costPrice: 46.1, latestPrice: 48.2 },
-    { tsCode: "600988.SH", name: "赤峰黄金", industry: "贵金属", weight: 10.8, shares: 1400, costPrice: 35.6, latestPrice: 38.7 },
-    { tsCode: "601919.SH", name: "中远海控", industry: "航运", weight: 12.5, shares: 4000, costPrice: 15.74, latestPrice: 16.1 },
-    { tsCode: "000858.SZ", name: "五粮液", industry: "白酒", weight: 8.6, shares: 350, costPrice: 102.8, latestPrice: 103.6 },
-    { tsCode: "600406.SH", name: "国电南瑞", industry: "电力设备", weight: 8.1, shares: 1400, costPrice: 28.95, latestPrice: 28.8 },
-    { tsCode: "605589.SH", name: "圣泉集团", industry: "化工", weight: 6.2, shares: 1200, costPrice: 31.5, latestPrice: 32.4 },
-  ],
-  "2026-04-08": [
-    { tsCode: "600519.SH", name: "贵州茅台", industry: "白酒", weight: 13.3, shares: 90, costPrice: 1416.0, latestPrice: 1441.2 },
-    { tsCode: "601088.SH", name: "中国神华", industry: "煤炭", weight: 12.4, shares: 1000, costPrice: 45.7, latestPrice: 47.3 },
-    { tsCode: "600988.SH", name: "赤峰黄金", industry: "贵金属", weight: 9.9, shares: 1300, costPrice: 35.4, latestPrice: 37.6 },
-    { tsCode: "601919.SH", name: "中远海控", industry: "航运", weight: 11.6, shares: 3600, costPrice: 15.6, latestPrice: 15.8 },
-    { tsCode: "000858.SZ", name: "五粮液", industry: "白酒", weight: 8.2, shares: 300, costPrice: 102.1, latestPrice: 101.7 },
-    { tsCode: "600406.SH", name: "国电南瑞", industry: "电力设备", weight: 7.5, shares: 1300, costPrice: 28.7, latestPrice: 28.9 },
-    { tsCode: "605589.SH", name: "圣泉集团", industry: "化工", weight: 5.8, shares: 1100, costPrice: 31.1, latestPrice: 31.9 },
-  ],
-};
-
-const historyReturns: ReturnPoint[] = [
-  { date: "2026-04-14", netValue: 1.017, dailyReturnPct: 0.52, drawdownPct: -0.72 },
-  { date: "2026-04-15", netValue: 1.011, dailyReturnPct: -0.59, drawdownPct: -1.31 },
-  { date: "2026-04-16", netValue: 1.026, dailyReturnPct: 1.48, drawdownPct: -0.12 },
-  { date: "2026-04-17", netValue: 1.034, dailyReturnPct: 0.78, drawdownPct: 0 },
-  { date: "2026-04-18", netValue: 1.029, dailyReturnPct: -0.48, drawdownPct: -0.48 },
-  { date: "2026-04-19", netValue: 1.041, dailyReturnPct: 1.16, drawdownPct: 0 },
-  { date: "2026-04-20", netValue: 1.046, dailyReturnPct: 0.48, drawdownPct: 0 },
-  { date: "2026-04-21", netValue: 1.039, dailyReturnPct: -0.67, drawdownPct: -0.67 },
-  { date: "2026-04-22", netValue: 1.051, dailyReturnPct: 1.15, drawdownPct: 0 },
-];
-
-const oneWeekReturnPct = 2.87;
-const oneMonthReturnPct = 7.64;
-const sharpeRatio = 1.42;
-const maxDrawdownPct = -4.93;
-const annualizedReturnPct = 15.6;
 const chartColors = ["#0f766e", "#0369a1", "#16a34a", "#9333ea", "#f59e0b", "#ef4444", "#334155"];
 
 export default function PortfolioPage() {
-  const availablePositionDates = Object.keys(positionsByDate).sort((a, b) => (a > b ? -1 : 1));
-  const [selectedPositionDate, setSelectedPositionDate] = useState(availablePositionDates[0] ?? "");
-  const activePositions = useMemo(
-    () => positionsByDate[selectedPositionDate] ?? positionsByDate[availablePositionDates[0]] ?? [],
-    [availablePositionDates, selectedPositionDate]
+  const [availableVersions, setAvailableVersions] = useState<string[]>([]);
+  const [selectedVersion, setSelectedVersion] = useState("");
+  const [availablePositionDates, setAvailablePositionDates] = useState<string[]>([]);
+  const [selectedPositionDate, setSelectedPositionDate] = useState("");
+  const [snapshot, setSnapshot] = useState<PortfolioSnapshotData | null>(null);
+  const [historyReturns, setHistoryReturns] = useState<PortfolioHistoryPoint[]>([]);
+  const [loadingVersions, setLoadingVersions] = useState(false);
+  const [loadingDates, setLoadingDates] = useState(false);
+  const [loadingSnapshot, setLoadingSnapshot] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [error, setError] = useState("");
+  const availableDateSet = useMemo(() => new Set(availablePositionDates), [availablePositionDates]);
+  const selectedCalendarDate = useMemo(
+    () => (selectedPositionDate ? compactDateStringToDate(selectedPositionDate) : undefined),
+    [selectedPositionDate]
   );
+
+  useEffect(() => {
+    let disposed = false;
+    const loadVersions = async () => {
+      setLoadingVersions(true);
+      setError("");
+      try {
+        const response = await getPortfolioDecisionVersions();
+        if (disposed) return;
+        const versions = response.data?.versions ?? [];
+        setAvailableVersions(versions);
+        setSelectedVersion(versions[0] ?? "");
+      } catch (err) {
+        if (disposed) return;
+        setError(err instanceof Error ? err.message : "获取版本列表失败");
+      } finally {
+        if (!disposed) setLoadingVersions(false);
+      }
+    };
+    loadVersions();
+    return () => {
+      disposed = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedVersion) {
+      setAvailablePositionDates([]);
+      setSelectedPositionDate("");
+      return;
+    }
+    let disposed = false;
+    const loadDates = async () => {
+      setLoadingDates(true);
+      setError("");
+      try {
+        const response = await getPortfolioSnapshotDatesByVersion(selectedVersion);
+        if (disposed) return;
+        const dates = (response.data?.dates ?? []).map(normalizeCompactDateString);
+        setAvailablePositionDates(dates);
+        setSelectedPositionDate((prev) => (dates.includes(prev) ? prev : dates[0] ?? ""));
+      } catch (err) {
+        if (disposed) return;
+        setAvailablePositionDates([]);
+        setSelectedPositionDate("");
+        setError(err instanceof Error ? err.message : "获取持仓日期失败");
+      } finally {
+        if (!disposed) setLoadingDates(false);
+      }
+    };
+    loadDates();
+    return () => {
+      disposed = true;
+    };
+  }, [selectedVersion]);
+
+  useEffect(() => {
+    if (!selectedVersion || !selectedPositionDate) {
+      setSnapshot(null);
+      return;
+    }
+    let disposed = false;
+    const loadSnapshot = async () => {
+      setLoadingSnapshot(true);
+      setError("");
+      try {
+        const response = await getPortfolioSnapshotByVersionAndTradeDate(selectedVersion, selectedPositionDate);
+        if (disposed) return;
+        setSnapshot(response.data ?? null);
+      } catch (err) {
+        if (disposed) return;
+        setSnapshot(null);
+        setError(err instanceof Error ? err.message : "获取组合快照失败");
+      } finally {
+        if (!disposed) setLoadingSnapshot(false);
+      }
+    };
+    loadSnapshot();
+    return () => {
+      disposed = true;
+    };
+  }, [selectedVersion, selectedPositionDate]);
+
+  useEffect(() => {
+    if (!selectedVersion) {
+      setHistoryReturns([]);
+      return;
+    }
+    let disposed = false;
+    const loadHistory = async () => {
+      setLoadingHistory(true);
+      setError("");
+      try {
+        const response = await getPortfolioHistoryByVersion(selectedVersion);
+        if (disposed) return;
+        setHistoryReturns(response.data?.series ?? []);
+      } catch (err) {
+        if (disposed) return;
+        setHistoryReturns([]);
+        setError(err instanceof Error ? err.message : "获取历史收益失败");
+      } finally {
+        if (!disposed) setLoadingHistory(false);
+      }
+    };
+    loadHistory();
+    return () => {
+      disposed = true;
+    };
+  }, [selectedVersion]);
+
+  const activePositions = snapshot?.positions ?? [];
+  const metrics = snapshot?.metrics;
   const sortedPositions = useMemo(
     () =>
       [...activePositions]
@@ -105,7 +169,7 @@ export default function PortfolioPage() {
         .map((item, index) => ({
           ...item,
           rank: index + 1,
-          positionSize: item.shares * item.latestPrice,
+          positionSize: item.shares * item.latest_price,
           displayName: `${index + 1}. ${item.name}`,
         })),
     [activePositions]
@@ -113,25 +177,14 @@ export default function PortfolioPage() {
   const totalReturnSeries = useMemo(
     () =>
       historyReturns.map((row) => ({
-        ...row,
-        totalReturnPct: (row.netValue - 1) * 100,
+        date: row.date,
+        netValue: row.net_value,
+        dailyReturnPct: row.daily_return_pct,
+        drawdownPct: row.drawdown_pct,
+        totalReturnPct: (row.net_value - 1) * 100,
       })),
-    []
+    [historyReturns]
   );
-  const industryDistribution = useMemo(() => {
-    const industryWeightMap = activePositions.reduce<Record<string, number>>((acc, item) => {
-      acc[item.industry] = (acc[item.industry] ?? 0) + item.weight;
-      return acc;
-    }, {});
-
-    return Object.entries(industryWeightMap)
-      .map(([industry, totalWeight]) => ({ industry, totalWeight }))
-      .sort((a, b) => b.totalWeight - a.totalWeight)
-      .map((item, index) => ({
-        ...item,
-        displayName: `${index + 1}. ${item.industry}`,
-      }));
-  }, [activePositions]);
 
   return (
     <main className="mx-auto w-full max-w-6xl px-6 pb-10 pt-0">
@@ -140,34 +193,64 @@ export default function PortfolioPage() {
           <div>
             <h1 className="text-2xl font-bold text-slate-900">收益与持仓</h1>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              展示组合当前全部持仓与核心绩效指标，包括历史收益、夏普比率、最大回撤及阶段收益表现。
+              展示组合当前全部持仓与核心绩效指标，包括历史收益、夏普比率、最大回撤及阶段收益表现。先选版本，再选持仓日期。
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <label htmlFor="position-date" className="text-sm font-medium text-slate-700">
-              持仓日期
+          <div className="flex flex-wrap items-center gap-3">
+            <label htmlFor="portfolio-version" className="text-sm font-medium text-slate-700">
+              版本
             </label>
             <select
-              id="position-date"
-              value={selectedPositionDate}
-              onChange={(event) => setSelectedPositionDate(event.target.value)}
+              id="portfolio-version"
+              value={selectedVersion}
+              onChange={(event) => setSelectedVersion(event.target.value)}
               className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:border-slate-400"
             >
-              {availablePositionDates.map((date) => (
-                <option key={date} value={date}>
-                  {date}
+              {availableVersions.map((version) => (
+                <option key={version} value={version}>
+                  {version}
                 </option>
               ))}
             </select>
+            <label htmlFor="position-date" className="text-sm font-medium text-slate-700">
+              持仓日期
+            </label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button id="position-date" variant="outline" className="w-[180px] justify-start text-left font-normal">
+                  {selectedPositionDate || "请选择"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={selectedCalendarDate}
+                  onSelect={(date) => {
+                    if (!date) return;
+                    const normalizedDate = dateToCompactDateString(date);
+                    if (availableDateSet.has(normalizedDate)) {
+                      setSelectedPositionDate(normalizedDate);
+                    }
+                  }}
+                  disabled={(date) => !availableDateSet.has(dateToCompactDateString(date))}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
+        {loadingVersions ? <p className="text-sm text-slate-500">版本加载中...</p> : null}
+        {loadingDates ? <p className="text-sm text-slate-500">持仓日期加载中...</p> : null}
+        {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+        {!snapshot && !loadingSnapshot ? <p className="text-sm text-slate-500">暂无可展示的数据。</p> : null}
+        {loadingSnapshot ? <p className="text-sm text-slate-500">快照加载中...</p> : null}
+        {loadingHistory ? <p className="text-sm text-slate-500">历史收益加载中...</p> : null}
 
         <div className="grid gap-4 md:grid-cols-5">
-          <Metric title="历史收益(年化)" value={`${annualizedReturnPct.toFixed(2)}%`} valueClassName="text-emerald-600" />
-          <Metric title="夏普比率" value={sharpeRatio.toFixed(2)} />
-          <Metric title="最大回撤" value={`${maxDrawdownPct.toFixed(2)}%`} valueClassName="text-rose-600" />
-          <Metric title="近一周收益" value={`${oneWeekReturnPct.toFixed(2)}%`} valueClassName="text-emerald-600" />
-          <Metric title="近一月收益" value={`${oneMonthReturnPct.toFixed(2)}%`} valueClassName="text-emerald-600" />
+          <Metric title="历史收益(年化)" value={`${(metrics?.annualized_return_pct ?? 0).toFixed(2)}%`} valueClassName="text-emerald-600" />
+          <Metric title="夏普比率" value={(metrics?.sharpe_ratio ?? 0).toFixed(2)} />
+          <Metric title="最大回撤" value={`${(metrics?.max_drawdown_pct ?? 0).toFixed(2)}%`} valueClassName="text-rose-600" />
+          <Metric title="近一周收益" value={`${(metrics?.one_week_return_pct ?? 0).toFixed(2)}%`} valueClassName="text-emerald-600" />
+          <Metric title="近一月收益" value={`${(metrics?.one_month_return_pct ?? 0).toFixed(2)}%`} valueClassName="text-emerald-600" />
         </div>
 
         <Card className="rounded-none py-0">
@@ -187,7 +270,7 @@ export default function PortfolioPage() {
           </CardContent>
         </Card>
 
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4">
           <Card className="rounded-none py-0">
             <CardHeader className="px-4 pt-4 pb-0">
               <CardTitle className="text-base text-slate-900">持仓占比柱状图</CardTitle>
@@ -201,39 +284,10 @@ export default function PortfolioPage() {
                   <Tooltip formatter={(value) => `${Number(value).toFixed(2)}%`} />
                   <Bar dataKey="weight" radius={[0, 2, 2, 0]}>
                     {sortedPositions.map((item, index) => (
-                      <Cell key={item.tsCode} fill={chartColors[index % chartColors.length]} />
+                      <Cell key={item.ts_code} fill={chartColors[index % chartColors.length]} />
                     ))}
                   </Bar>
                 </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-none py-0">
-            <CardHeader className="px-4 pt-4 pb-0">
-              <CardTitle className="text-base text-slate-900">行业分布图</CardTitle>
-            </CardHeader>
-            <CardContent className="h-[320px] px-2 pb-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={industryDistribution}
-                    dataKey="totalWeight"
-                    nameKey="industry"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={105}
-                    label={(item) => {
-                      const payload = item.payload as IndustryDistribution | undefined;
-                      return payload ? `${payload.industry} ${payload.totalWeight.toFixed(1)}%` : "";
-                    }}
-                  >
-                    {industryDistribution.map((item, index) => (
-                      <Cell key={item.industry} fill={chartColors[index % chartColors.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => `${Number(value).toFixed(2)}%`} />
-                </PieChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
@@ -261,24 +315,27 @@ export default function PortfolioPage() {
               </thead>
               <tbody>
                 {sortedPositions.map((item) => {
-                  const pnlPct = ((item.latestPrice - item.costPrice) / item.costPrice) * 100;
+                  const costPrice = toNullableNumber(item.cost_price);
+                  const latestPrice = toNullableNumber(item.latest_price);
+                  const pnlPct = costPrice && latestPrice ? ((latestPrice - costPrice) / costPrice) * 100 : null;
                   return (
-                    <tr key={item.tsCode} className="hover:bg-slate-50/70">
+                    <tr key={item.ts_code} className="hover:bg-slate-50/70">
                       <td className="border-b border-slate-100 px-3 py-2">{item.rank}</td>
-                      <td className="border-b border-slate-100 px-3 py-2">{item.tsCode}</td>
+                      <td className="border-b border-slate-100 px-3 py-2">{item.ts_code}</td>
                       <td className="border-b border-slate-100 px-3 py-2">{item.name}</td>
                       <td className="border-b border-slate-100 px-3 py-2">{item.industry}</td>
-                      <td className="border-b border-slate-100 px-3 py-2 text-right">{item.weight.toFixed(2)}%</td>
-                      <td className="border-b border-slate-100 px-3 py-2 text-right">{item.shares.toLocaleString()}</td>
-                      <td className="border-b border-slate-100 px-3 py-2 text-right">{item.costPrice.toFixed(2)}</td>
-                      <td className="border-b border-slate-100 px-3 py-2 text-right">{item.latestPrice.toFixed(2)}</td>
+                      <td className="border-b border-slate-100 px-3 py-2 text-right">{formatPercent(item.weight)}</td>
+                      <td className="border-b border-slate-100 px-3 py-2 text-right">
+                        {typeof item.shares === "number" ? item.shares.toLocaleString() : "-"}
+                      </td>
+                      <td className="border-b border-slate-100 px-3 py-2 text-right">{formatNumber(item.cost_price)}</td>
+                      <td className="border-b border-slate-100 px-3 py-2 text-right">{formatNumber(item.latest_price)}</td>
                       <td
                         className={`border-b border-slate-100 px-3 py-2 text-right font-medium ${
-                          pnlPct >= 0 ? "text-emerald-600" : "text-rose-600"
+                          pnlPct === null ? "text-slate-400" : pnlPct >= 0 ? "text-emerald-600" : "text-rose-600"
                         }`}
                       >
-                        {pnlPct >= 0 ? "+" : ""}
-                        {pnlPct.toFixed(2)}%
+                        {pnlPct === null ? "-" : `${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(2)}%`}
                       </td>
                     </tr>
                   );
@@ -308,16 +365,19 @@ export default function PortfolioPage() {
                 {historyReturns.map((row) => (
                   <tr key={row.date} className="hover:bg-slate-50/70">
                     <td className="border-b border-slate-100 px-3 py-2">{row.date}</td>
-                    <td className="border-b border-slate-100 px-3 py-2 text-right">{row.netValue.toFixed(3)}</td>
+                    <td className="border-b border-slate-100 px-3 py-2 text-right">{formatNumber(row.net_value, 3)}</td>
                     <td
                       className={`border-b border-slate-100 px-3 py-2 text-right font-medium ${
-                        row.dailyReturnPct >= 0 ? "text-emerald-600" : "text-rose-600"
+                        toNullableNumber(row.daily_return_pct) === null
+                          ? "text-slate-400"
+                          : (row.daily_return_pct ?? 0) >= 0
+                            ? "text-emerald-600"
+                            : "text-rose-600"
                       }`}
                     >
-                      {row.dailyReturnPct >= 0 ? "+" : ""}
-                      {row.dailyReturnPct.toFixed(2)}%
+                      {formatSignedPercent(row.daily_return_pct)}
                     </td>
-                    <td className="border-b border-slate-100 px-3 py-2 text-right text-rose-600">{row.drawdownPct.toFixed(2)}%</td>
+                    <td className="border-b border-slate-100 px-3 py-2 text-right text-rose-600">{formatPercent(row.drawdown_pct)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -347,4 +407,43 @@ function Metric({
       <CardContent className={`px-4 pt-2 pb-4 text-sm font-medium ${valueClassName}`}>{value}</CardContent>
     </Card>
   );
+}
+
+function toNullableNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function formatNumber(value: unknown, digits = 2) {
+  const numericValue = toNullableNumber(value);
+  return numericValue === null ? "-" : numericValue.toFixed(digits);
+}
+
+function formatPercent(value: unknown, digits = 2) {
+  const numericValue = toNullableNumber(value);
+  return numericValue === null ? "-" : `${numericValue.toFixed(digits)}%`;
+}
+
+function formatSignedPercent(value: unknown, digits = 2) {
+  const numericValue = toNullableNumber(value);
+  if (numericValue === null) return "-";
+  return `${numericValue >= 0 ? "+" : ""}${numericValue.toFixed(digits)}%`;
+}
+
+function compactDateStringToDate(value: string) {
+  const normalizedValue = normalizeCompactDateString(value);
+  const year = Number(normalizedValue.slice(0, 4));
+  const month = Number(normalizedValue.slice(4, 6));
+  const day = Number(normalizedValue.slice(6, 8));
+  return new Date(year, month - 1, day, 12, 0, 0);
+}
+
+function dateToCompactDateString(date: Date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}${month}${day}`;
+}
+
+function normalizeCompactDateString(value: string) {
+  return value.replaceAll("-", "");
 }

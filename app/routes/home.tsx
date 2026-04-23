@@ -102,10 +102,13 @@ export default function Home() {
       try {
         const response = await getHomePortfolioSummary();
         const data = response.data;
+        const topFivePositions = [...(data?.top_positions ?? [])]
+          .sort((a, b) => b.weight - a.weight)
+          .slice(0, 5);
 
         if (disposed) return;
 
-        setTopPositions(data?.top_positions ?? []);
+        setTopPositions(topFivePositions);
         setMonthlyReturnData(data?.monthly_returns ?? []);
         setPortfolioMetrics(
           data?.metrics ?? {
@@ -175,6 +178,97 @@ export default function Home() {
               </div>
             </div>
           </div>
+        </section>
+
+        <section className="border-t border-slate-200 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-semibold text-slate-900">组合与收益</h2>
+            </div>
+            <Link
+              to="/portfolio"
+              className="text-sm font-medium text-slate-700 underline-offset-4 hover:underline"
+            >
+              进入组合中心
+            </Link>
+          </div>
+          <div className="mt-5 grid items-stretch gap-6 lg:grid-cols-2">
+            <div className="flex h-full flex-col">
+              <h3 className="text-base font-semibold text-slate-900">当前组合前五大持仓</h3>
+              <div className="mt-3 flex-1 divide-y divide-slate-200 border border-slate-200">
+                {topPositions.map((position) => (
+                  <div key={position.name} className="flex items-center justify-between px-4 py-3">
+                    <div>
+                      <span className="text-sm text-slate-700">{position.name}</span>
+                      <p className="mt-1 text-xs text-slate-500">
+                        成本价：{position.cost_price.toFixed(2)}
+                      </p>
+                    </div>
+                    <span className="text-sm font-medium text-slate-900">
+                      {formatWeightPercentage(position.weight)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              {!portfolioLoading && !portfolioError && topPositions.length === 0 ? (
+                <p className="mt-3 text-sm text-slate-500">暂无持仓数据。</p>
+              ) : null}
+            </div>
+
+            <div className="flex h-full min-h-[380px] flex-col">
+              <div className="flex items-end justify-between">
+                <h3 className="text-base font-semibold text-slate-900">收益率</h3>
+                <span className="text-sm font-medium text-emerald-600">
+                  {formatPercentage(portfolioMetrics.total_return_pct)}
+                </span>
+              </div>
+              <div className="mt-3 flex-1 border border-slate-200 p-3">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={monthlyReturnData}
+                    margin={{ top: 8, right: 8, left: -10, bottom: 0 }}
+                  >
+                    <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
+                    <XAxis dataKey="month" tick={{ fill: "#64748b", fontSize: 12 }} />
+                    <YAxis
+                      unit="%"
+                      tick={{ fill: "#64748b", fontSize: 12 }}
+                      tickFormatter={(value) => `${value}`}
+                    />
+                    <Tooltip formatter={(value) => [`${value ?? 0}%`, "收益率"]} />
+                    <Line
+                      type="monotone"
+                      dataKey="value"
+                      stroke="#16a34a"
+                      strokeWidth={2.5}
+                      dot={{ r: 3 }}
+                      activeDot={{ r: 5 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              <Card className="mt-3 rounded-none py-0">
+                <CardContent className="grid grid-cols-2 gap-4 px-4 py-4">
+                  <div>
+                    <p className="text-xs text-slate-500">最大回撤</p>
+                    <p className="mt-1 text-lg font-semibold text-rose-600">
+                      {formatPercentage(portfolioMetrics.max_drawdown_pct)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">总收益</p>
+                    <p className="mt-1 text-lg font-semibold text-emerald-600">
+                      {formatPercentage(portfolioMetrics.total_return_pct)}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+          {portfolioLoading ? <p className="mt-4 text-sm text-slate-500">加载中...</p> : null}
+          {!portfolioLoading && portfolioError ? (
+            <p className="mt-4 text-sm text-rose-600">{portfolioError}</p>
+          ) : null}
         </section>
 
         <section className="border-t border-slate-200 p-6">
@@ -307,97 +401,6 @@ export default function Home() {
               </PaginationItem>
             </PaginationContent>
           </Pagination>
-        </section>
-
-        <section className="border-t border-slate-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-semibold text-slate-900">组合与收益</h2>
-            </div>
-            <Link
-              to="/portfolio"
-              className="text-sm font-medium text-slate-700 underline-offset-4 hover:underline"
-            >
-              进入组合中心
-            </Link>
-          </div>
-          <div className="mt-5 grid items-stretch gap-6 lg:grid-cols-2">
-            <div className="flex h-full flex-col">
-              <h3 className="text-base font-semibold text-slate-900">当前组合前五大持仓</h3>
-              <div className="mt-3 flex-1 divide-y divide-slate-200 border border-slate-200">
-                {topPositions.map((position) => (
-                  <div key={position.name} className="flex items-center justify-between px-4 py-3">
-                    <div>
-                      <span className="text-sm text-slate-700">{position.name}</span>
-                      <p className="mt-1 text-xs text-slate-500">
-                        成本价：{position.cost_price.toFixed(2)}
-                      </p>
-                    </div>
-                    <span className="text-sm font-medium text-slate-900">
-                      {formatWeightPercentage(position.weight)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              {!portfolioLoading && !portfolioError && topPositions.length === 0 ? (
-                <p className="mt-3 text-sm text-slate-500">暂无持仓数据。</p>
-              ) : null}
-            </div>
-
-            <div className="flex h-full min-h-[380px] flex-col">
-              <div className="flex items-end justify-between">
-                <h3 className="text-base font-semibold text-slate-900">近 5 次收益率</h3>
-                <span className="text-sm font-medium text-emerald-600">
-                  {formatPercentage(portfolioMetrics.total_return_pct)}
-                </span>
-              </div>
-              <div className="mt-3 flex-1 border border-slate-200 p-3">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={monthlyReturnData}
-                    margin={{ top: 8, right: 8, left: -10, bottom: 0 }}
-                  >
-                    <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
-                    <XAxis dataKey="month" tick={{ fill: "#64748b", fontSize: 12 }} />
-                    <YAxis
-                      unit="%"
-                      tick={{ fill: "#64748b", fontSize: 12 }}
-                      tickFormatter={(value) => `${value}`}
-                    />
-                    <Tooltip formatter={(value) => [`${value ?? 0}%`, "收益率"]} />
-                    <Line
-                      type="monotone"
-                      dataKey="value"
-                      stroke="#16a34a"
-                      strokeWidth={2.5}
-                      dot={{ r: 3 }}
-                      activeDot={{ r: 5 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-              <Card className="mt-3 rounded-none py-0">
-                <CardContent className="grid grid-cols-2 gap-4 px-4 py-4">
-                  <div>
-                    <p className="text-xs text-slate-500">最大回撤</p>
-                    <p className="mt-1 text-lg font-semibold text-rose-600">
-                      {formatPercentage(portfolioMetrics.max_drawdown_pct)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500">总收益</p>
-                    <p className="mt-1 text-lg font-semibold text-emerald-600">
-                      {formatPercentage(portfolioMetrics.total_return_pct)}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-          {portfolioLoading ? <p className="mt-4 text-sm text-slate-500">加载中...</p> : null}
-          {!portfolioLoading && portfolioError ? (
-            <p className="mt-4 text-sm text-rose-600">{portfolioError}</p>
-          ) : null}
         </section>
       </div>
     </main>

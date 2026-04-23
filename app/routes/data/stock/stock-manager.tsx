@@ -1,46 +1,118 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
+import { Calendar } from "~/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import type { StockManagerSummary } from "~/types/data/stock";
-
-const managerByDateAndStock: Record<string, Record<string, StockManagerSummary>> = {
-  "2025-04-10": {
-    "000519.SZ": {
-      tsCode: "000519.SZ",
-      success: true,
-      overallScore: 48,
-      confidence: "中",
-      selectionReason: "基本面偏弱与技术面震荡的综合评估结果。",
-      riskLevel: "高",
-      componentScores: { fundamental: 45, technical: 55 },
-      actionSignal: "watch",
-      signalReason: "基本面存在显著盈利与现金流风险，技术面方向不明，需等待基本面改善或技术面突破的明确信号。",
-      keyPoints: [
-        "基本面核心矛盾突出：资产负债表健康（低杠杆、高现金），但利润表与现金流量表表现堪忧（增收不增利、经营现金流为负、依赖融资）。",
-        "技术面呈区间震荡格局：价格在16.5-18.1区间内整理，短期指标与中期指标信号矛盾，趋势不明。",
-        "估值偏高且市场情绪偏热：当前估值处于较高水平，交易活跃，已包含对高增长的乐观预期。",
-        "股东回报吸引力低：无现金分红计划，历史股息率较低，公司资源优先用于业务扩张。",
-        "资产结构存在潜在风险：存货占比高，可能存在减值或周转风险；负债增速快于资产增速。",
-      ],
-      risks: [
-        "盈利与增长质量风险：收入增长但核心利润亏损，成本控制或定价能力存疑。",
-        "现金流断裂风险：经营现金流持续为负，自由现金流紧张，依赖外部融资。",
-        "高估值回调风险：若业绩无法兑现，股价可能出现较大回调。",
-        "业务与运营风险：订单波动、存货减值及高研发投入侵蚀短期利润。",
-      ],
-      summary:
-        "中兵红箭呈现显著的财务结构性矛盾：稳健资产负债表与疲弱盈利及现金流并存。技术面区间震荡，多空力量暂时平衡。后续重点跟踪盈利修复、现金流改善及技术面放量突破。",
-    },
-  },
-};
+import { Popover, PopoverContent, PopoverTrigger } from "~/components/ui/popover";
+import {
+  getStockManagerByCodeAndDate,
+  getStockManagerDatesByCode,
+  getStockManagerTsCodes,
+  type StockManagerData,
+} from "~/lib/stock";
 
 export default function StockManagerPage() {
-  const dateOptions = Object.keys(managerByDateAndStock).sort((a, b) => (a > b ? -1 : 1));
-  const [selectedDate, setSelectedDate] = useState(dateOptions[0] ?? "");
-  const stockOptions = useMemo(() => Object.keys(managerByDateAndStock[selectedDate] ?? {}), [selectedDate]);
-  const [selectedStock, setSelectedStock] = useState(stockOptions[0] ?? "");
-  const activeStock = stockOptions.includes(selectedStock) ? selectedStock : stockOptions[0];
-  const summary = managerByDateAndStock[selectedDate]?.[activeStock] ?? managerByDateAndStock["2025-04-10"]["000519.SZ"];
+  const [stockOptions, setStockOptions] = useState<string[]>([]);
+  const [dateOptions, setDateOptions] = useState<string[]>([]);
+  const [selectedStock, setSelectedStock] = useState("");
+  const [selectedDate, setSelectedDate] = useState("");
+  const [summary, setSummary] = useState<StockManagerData | null>(null);
+  const [loadingStocks, setLoadingStocks] = useState(false);
+  const [loadingDates, setLoadingDates] = useState(false);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [error, setError] = useState("");
+  const availableDateSet = useMemo(() => new Set(dateOptions), [dateOptions]);
+  const selectedCalendarDate = useMemo(
+    () => (selectedDate ? compactDateStringToDate(selectedDate) : undefined),
+    [selectedDate]
+  );
+
+  useEffect(() => {
+    let disposed = false;
+    const loadStocks = async () => {
+      setLoadingStocks(true);
+      setError("");
+      try {
+        const response = await getStockManagerTsCodes();
+        if (disposed) return;
+        const codes = response.data?.ts_codes ?? [];
+        setStockOptions(codes);
+        setSelectedStock(codes[0] ?? "");
+      } catch (err) {
+        if (disposed) return;
+        setError(err instanceof Error ? err.message : "获取股票列表失败");
+      } finally {
+        if (!disposed) setLoadingStocks(false);
+      }
+    };
+
+    loadStocks();
+    return () => {
+      disposed = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedStock) {
+      setDateOptions([]);
+      setSelectedDate("");
+      return;
+    }
+
+    let disposed = false;
+    const loadDates = async () => {
+      setLoadingDates(true);
+      setError("");
+      try {
+        const response = await getStockManagerDatesByCode(selectedStock);
+        if (disposed) return;
+        const dates = response.data?.dates ?? [];
+        setDateOptions(dates);
+        setSelectedDate((prev) => (dates.includes(prev) ? prev : dates[0] ?? ""));
+      } catch (err) {
+        if (disposed) return;
+        setDateOptions([]);
+        setSelectedDate("");
+        setError(err instanceof Error ? err.message : "获取日期列表失败");
+      } finally {
+        if (!disposed) setLoadingDates(false);
+      }
+    };
+
+    loadDates();
+    return () => {
+      disposed = true;
+    };
+  }, [selectedStock]);
+
+  useEffect(() => {
+    if (!selectedStock || !selectedDate) {
+      setSummary(null);
+      return;
+    }
+
+    let disposed = false;
+    const loadDetail = async () => {
+      setLoadingDetail(true);
+      setError("");
+      try {
+        const response = await getStockManagerByCodeAndDate(selectedStock, selectedDate);
+        if (disposed) return;
+        setSummary(response.data ?? null);
+      } catch (err) {
+        if (disposed) return;
+        setSummary(null);
+        setError(err instanceof Error ? err.message : "获取个股综合结果失败");
+      } finally {
+        if (!disposed) setLoadingDetail(false);
+      }
+    };
+
+    loadDetail();
+    return () => {
+      disposed = true;
+    };
+  }, [selectedDate, selectedStock]);
 
   return (
     <section className="space-y-6">
@@ -49,23 +121,9 @@ export default function StockManagerPage() {
         <p className="mt-2 text-sm leading-6 text-slate-600">聚合基本面与技术面评分，输出交易信号、关键观点与风险提示。</p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <label className="space-y-1">
-            <span className="text-xs text-slate-500">选择日期</span>
-            <select
-              value={selectedDate}
-              onChange={(event) => setSelectedDate(event.target.value)}
-              className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:border-slate-400"
-            >
-              {dateOptions.map((date) => (
-                <option key={date} value={date}>
-                  {date}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="space-y-1">
             <span className="text-xs text-slate-500">选择股票</span>
             <select
-              value={activeStock}
+              value={selectedStock}
               onChange={(event) => setSelectedStock(event.target.value)}
               className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:border-slate-400"
             >
@@ -76,14 +134,54 @@ export default function StockManagerPage() {
               ))}
             </select>
           </label>
+          <label className="space-y-1">
+            <span className="text-xs text-slate-500">选择日期</span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="h-9 w-full justify-start text-left font-normal">
+                  {selectedDate || "请选择"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={selectedCalendarDate}
+                  onSelect={(date) => {
+                    if (!date) return;
+                    const normalizedDate = dateToCompactDateString(date);
+                    if (availableDateSet.has(normalizedDate)) {
+                      setSelectedDate(normalizedDate);
+                    }
+                  }}
+                  disabled={(date) => !availableDateSet.has(dateToCompactDateString(date))}
+                />
+              </PopoverContent>
+            </Popover>
+          </label>
         </div>
+        {loadingStocks ? <p className="mt-3 text-sm text-slate-500">股票列表加载中...</p> : null}
+        {loadingDates ? <p className="mt-1 text-sm text-slate-500">日期列表加载中...</p> : null}
       </div>
 
+      {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+      {!loadingDetail && !summary ? (
+        <Card className="rounded-none py-0">
+          <CardContent className="px-4 py-4 text-sm text-slate-500">暂无可展示的数据。</CardContent>
+        </Card>
+      ) : null}
+      {loadingDetail ? (
+        <Card className="rounded-none py-0">
+          <CardContent className="px-4 py-4 text-sm text-slate-500">数据加载中...</CardContent>
+        </Card>
+      ) : null}
+
+      {summary ? (
+        <>
       <div className="grid gap-4 md:grid-cols-4">
-        <Metric title="综合评分" value={String(summary.overallScore)} />
+        <Metric title="综合评分" value={String(summary.overall_score)} />
         <Metric title="置信度" value={summary.confidence} />
-        <Metric title="动作信号" value={summary.actionSignal} valueClassName="text-amber-600" />
-        <Metric title="风险等级" value={summary.riskLevel} valueClassName="text-rose-600" />
+        <Metric title="动作信号" value={summary.action_signal} valueClassName="text-amber-600" />
+        <Metric title="风险等级" value={summary.risk_level} valueClassName="text-rose-600" />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -92,10 +190,10 @@ export default function StockManagerPage() {
             <CardTitle className="text-base text-slate-900">组件评分</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 px-4 pt-3 pb-4 text-sm text-slate-700">
-            <ScoreBar label="基本面" value={summary.componentScores.fundamental} colorClassName="bg-blue-500" />
-            <ScoreBar label="技术面" value={summary.componentScores.technical} colorClassName="bg-violet-500" />
-            <p>动作信号原因：{summary.selectionReason}</p>
-            <p>信号解释：{summary.signalReason}</p>
+            <ScoreBar label="基本面" value={summary.component_scores.fundamental} colorClassName="bg-blue-500" />
+            <ScoreBar label="技术面" value={summary.component_scores.technical} colorClassName="bg-violet-500" />
+            <p>动作信号原因：{summary.selection_reason}</p>
+            <p>信号解释：{summary.signal_reason}</p>
           </CardContent>
         </Card>
 
@@ -105,10 +203,10 @@ export default function StockManagerPage() {
           </CardHeader>
           <CardContent className="space-y-2 px-4 pt-3 pb-4 text-sm text-slate-700">
             <div className="flex flex-wrap gap-2">
-              <Badge variant="outline">ts_code: {summary.tsCode}</Badge>
+              <Badge variant="outline">ts_code: {summary.ts_code}</Badge>
               <Badge variant="outline">success: {String(summary.success)}</Badge>
-              <Badge variant="outline">action: {summary.actionSignal}</Badge>
-              <Badge variant="outline">risk: {summary.riskLevel}</Badge>
+              <Badge variant="outline">action: {summary.action_signal}</Badge>
+              <Badge variant="outline">risk: {summary.risk_level}</Badge>
             </div>
             <p>{summary.summary}</p>
           </CardContent>
@@ -122,8 +220,8 @@ export default function StockManagerPage() {
           </CardHeader>
           <CardContent className="px-4 pt-3 pb-4 text-sm text-slate-700">
             <ul className="space-y-1">
-              {summary.keyPoints.map((item) => (
-                <li key={item}>- {item}</li>
+              {summary.key_points.map((item, index) => (
+                <li key={`${index}-${item}`}>- {item}</li>
               ))}
             </ul>
           </CardContent>
@@ -135,13 +233,15 @@ export default function StockManagerPage() {
           </CardHeader>
           <CardContent className="px-4 pt-3 pb-4 text-sm text-slate-700">
             <ul className="space-y-1">
-              {summary.risks.map((item) => (
-                <li key={item}>- {item}</li>
+              {summary.risks.map((item, index) => (
+                <li key={`${index}-${item}`}>- {item}</li>
               ))}
             </ul>
           </CardContent>
         </Card>
       </div>
+        </>
+      ) : null}
     </section>
   );
 }
@@ -177,4 +277,18 @@ function ScoreBar({ label, value, colorClassName }: { label: string; value: numb
       </div>
     </div>
   );
+}
+
+function compactDateStringToDate(value: string) {
+  const year = Number(value.slice(0, 4));
+  const month = Number(value.slice(4, 6));
+  const day = Number(value.slice(6, 8));
+  return new Date(year, month - 1, day, 12, 0, 0);
+}
+
+function dateToCompactDateString(date: Date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}${month}${day}`;
 }

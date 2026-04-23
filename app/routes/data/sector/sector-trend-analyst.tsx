@@ -1,104 +1,150 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { UTCTimestamp } from "lightweight-charts";
 import { KLineVolumeChart, type KLinePoint } from "~/components/charts/kline-volume-chart";
 import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
+import { Calendar } from "~/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import type { SectorKLineRow, SectorSeries, SectorTrendOutput } from "~/types/data/sector";
-
-const trendOutputByDate: Record<string, SectorTrendOutput> = {
-  "2025-03-20": {
-    summary:
-      "市场呈现明显的结构性分化，以电信、医疗保健、生物科技和运输为代表的趋势主线持续走强，而部分前期强势的化工和金属板块出现高位转弱迹象。",
-    conclusion:
-      "综合判断，市场处于趋势延续与板块轮动并存的混合状态。建议继续跟踪电信、医疗等强势主线，同时关注冰雪产业、火电等处于底部修复阶段的板块机会，对短期动量转弱的化工、通信设备等板块保持警惕。",
-    leadingThemes: ["无线电信业务Ⅲ", "保健护理机构", "生物科技Ⅲ", "海上运输", "自然景点"],
-    reversalOpportunities: ["冰雪产业", "火电", "焦炭加工", "公路铁路运输"],
-    topRiskSectors: ["多种化学制品", "商品化工", "通信设备", "化学制品", "铝"],
-    highlights: [
-      "趋势主线（电信、医疗、生物科技）呈现多周期动量共振，风险等级低。",
-      "修复机会主要集中在 base_repair 风格，如冰雪产业、火电，短期动量转正但中长期仍处低位或震荡。",
-      "高位风险板块（如多种化学制品、铝）普遍出现5日动量转负，显示短期上涨动能衰竭或面临调整压力。",
-      "市场未出现单一主导风格，趋势、修复、风险预警板块并存。",
-    ],
-    marketRegime: "mixed",
-  },
-  "2025-03-19": {
-    summary: "市场延续结构轮动，防御线相对稳健，成长主线分化增强。",
-    conclusion: "建议维持主线跟踪与低位修复并行，控制高位回撤风险。",
-    leadingThemes: ["无线电信业务Ⅲ", "生物科技Ⅲ", "保健护理机构"],
-    reversalOpportunities: ["火电", "公路铁路运输", "冰雪产业"],
-    topRiskSectors: ["商品化工", "通信设备", "铝"],
-    highlights: [
-      "主线强度仍在，但扩散度下降。",
-      "修复板块弹性增加，持续性待确认。",
-      "高位品种短期动量回落，注意止盈节奏。",
-    ],
-    marketRegime: "mixed",
-  },
-};
-
-const baseRows: SectorKLineRow[] = [
-  { tsCode: "865001.TI", tradeDate: "20201231", close: 1664.753, open: 1660.706, high: 1671.229, low: 1649.42, pctChange: 0.5646, vol: 13224.26 },
-  { tsCode: "865001.TI", tradeDate: "20201230", close: 1655.407, open: 1644.595, high: 1664.229, low: 1638.11, pctChange: 0.3073, vol: 10815.8 },
-  { tsCode: "865001.TI", tradeDate: "20201229", close: 1650.336, open: 1686.162, high: 1686.162, low: 1639.053, pctChange: -1.6263, vol: 11763.17 },
-  { tsCode: "865001.TI", tradeDate: "20201228", close: 1677.619, open: 1682.567, high: 1689.898, low: 1667.211, pctChange: 0.6698, vol: 11813.21 },
-  { tsCode: "865001.TI", tradeDate: "20201224", close: 1666.457, open: 1663.327, high: 1668.849, low: 1648.792, pctChange: 0.6533, vol: 6571.63 },
-  { tsCode: "865001.TI", tradeDate: "20200108", close: 1315.819, open: 1313.452, high: 1323.214, low: 1312.709, pctChange: 0.2567, vol: 33180.86 },
-  { tsCode: "865001.TI", tradeDate: "20200107", close: 1312.45, open: 1319.858, high: 1323.185, low: 1311.239, pctChange: -0.679, vol: 20959.51 },
-  { tsCode: "865001.TI", tradeDate: "20200106", close: 1321.423, open: 1322.809, high: 1328.027, low: 1314.889, pctChange: -0.5953, vol: 21283.4 },
-  { tsCode: "865001.TI", tradeDate: "20200103", close: 1329.337, open: 1309.615, high: 1330.664, low: 1309.281, pctChange: 0.6505, vol: 28610.53 },
-  { tsCode: "865001.TI", tradeDate: "20200102", close: 1320.746, open: 1342.622, high: 1343.126, low: 1308.663, pctChange: -1.1273, vol: 26149.74 },
-];
-
-function shiftedRows(tsCode: string, priceScale: number, volScale: number): SectorKLineRow[] {
-  return baseRows.map((row) => ({
-    ...row,
-    tsCode,
-    open: Number((row.open * priceScale).toFixed(3)),
-    high: Number((row.high * priceScale).toFixed(3)),
-    low: Number((row.low * priceScale).toFixed(3)),
-    close: Number((row.close * priceScale).toFixed(3)),
-    vol: Number((row.vol * volScale).toFixed(2)),
-  }));
-}
-
-const sectorSeriesList: SectorSeries[] = [
-  { tsCode: "865001.TI", name: "无线电信业务Ⅲ", rows: baseRows },
-  { tsCode: "865112.TI", name: "保健护理机构", rows: shiftedRows("865112.TI", 0.72, 0.85) },
-  { tsCode: "865207.TI", name: "生物科技Ⅲ", rows: shiftedRows("865207.TI", 0.89, 1.12) },
-  { tsCode: "865309.TI", name: "海上运输", rows: shiftedRows("865309.TI", 1.04, 0.94) },
-  { tsCode: "865418.TI", name: "自然景点", rows: shiftedRows("865418.TI", 0.67, 0.9) },
-];
+import { Popover, PopoverContent, PopoverTrigger } from "~/components/ui/popover";
+import {
+  getSectorTrendByTradeDate,
+  getSectorTrendDates,
+  getSectorTrendSeriesByCode,
+  type SectorTrendData,
+  type SectorTrendSeriesDetail,
+} from "~/lib/sector";
 
 export default function SectorTrendAnalystPage() {
-  const availableDates = Object.keys(trendOutputByDate).sort((a, b) => (a > b ? -1 : 1));
-  const [selectedDate, setSelectedDate] = useState(availableDates[0]);
-  const [selectedCode, setSelectedCode] = useState(sectorSeriesList[0].tsCode);
-  const trendOutput = useMemo(
-    () => trendOutputByDate[selectedDate] ?? trendOutputByDate[availableDates[0]],
-    [availableDates, selectedDate]
+  const [availableDates, setAvailableDates] = useState<string[]>([]);
+  const [selectedDate, setSelectedDate] = useState("");
+  const [trendOutput, setTrendOutput] = useState<SectorTrendData | null>(null);
+  const [selectedSeries, setSelectedSeries] = useState<SectorTrendSeriesDetail | null>(null);
+  const [loadingDates, setLoadingDates] = useState(false);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [loadingSeries, setLoadingSeries] = useState(false);
+  const [error, setError] = useState("");
+  const availableDateSet = useMemo(() => new Set(availableDates), [availableDates]);
+  const selectedCalendarDate = useMemo(
+    () => (selectedDate ? compactDateStringToDate(selectedDate) : undefined),
+    [selectedDate]
   );
-  const selectedSeries = useMemo(
-    () => sectorSeriesList.find((item) => item.tsCode === selectedCode) ?? sectorSeriesList[0],
-    [selectedCode]
-  );
+  const [selectedCode, setSelectedCode] = useState("");
+  const sectorSeriesList = trendOutput?.series_list ?? [];
+
+  useEffect(() => {
+    let disposed = false;
+    const loadDates = async () => {
+      setLoadingDates(true);
+      setError("");
+      try {
+        const response = await getSectorTrendDates();
+        const dates = response.data?.dates ?? [];
+        if (disposed) return;
+        setAvailableDates(dates);
+        setSelectedDate(dates[0] ?? "");
+      } catch (err) {
+        if (disposed) return;
+        setError(err instanceof Error ? err.message : "获取可选日期失败");
+      } finally {
+        if (!disposed) setLoadingDates(false);
+      }
+    };
+
+    loadDates();
+    return () => {
+      disposed = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedDate) {
+      setTrendOutput(null);
+      return;
+    }
+    let disposed = false;
+    const loadDetail = async () => {
+      setLoadingDetail(true);
+      setError("");
+      try {
+        const response = await getSectorTrendByTradeDate(selectedDate);
+        const data = response.data ?? null;
+        if (disposed) return;
+        setTrendOutput(data);
+        setSelectedCode(data?.series_list?.[0]?.ts_code ?? "");
+        setSelectedSeries(null);
+      } catch (err) {
+        if (disposed) return;
+        setTrendOutput(null);
+        setSelectedCode("");
+        setError(err instanceof Error ? err.message : "获取行业趋势分析数据失败");
+      } finally {
+        if (!disposed) setLoadingDetail(false);
+      }
+    };
+
+    loadDetail();
+    return () => {
+      disposed = true;
+    };
+  }, [selectedDate]);
+
+  useEffect(() => {
+    if (!selectedCode) {
+      setSelectedSeries(null);
+      return;
+    }
+
+    let disposed = false;
+    const loadSeries = async () => {
+      setLoadingSeries(true);
+      setError("");
+      try {
+        const response = await getSectorTrendSeriesByCode(selectedCode);
+        if (disposed) return;
+        setSelectedSeries(response.data ?? null);
+      } catch (err) {
+        if (disposed) return;
+        setSelectedSeries(null);
+        setError(err instanceof Error ? err.message : "获取板块行情数据失败");
+      } finally {
+        if (!disposed) setLoadingSeries(false);
+      }
+    };
+
+    loadSeries();
+    return () => {
+      disposed = true;
+    };
+  }, [selectedCode]);
 
   const klineData: KLinePoint[] = useMemo(
     () =>
-      [...selectedSeries.rows]
-        .sort((a, b) => Number(a.tradeDate) - Number(b.tradeDate))
-        .map((row) => ({
-          time: toUtcTimestamp(row.tradeDate),
-          open: row.open,
-          high: row.high,
-          low: row.low,
-          close: row.close,
-          volume: row.vol,
-        })),
-    [selectedSeries.rows]
+      [...(selectedSeries?.rows ?? [])]
+        .sort((a, b) => Number(a.trade_date) - Number(b.trade_date))
+        .map((row) => {
+          const time = toUtcTimestamp(row.trade_date);
+          if (time === null) return null;
+          return {
+            time,
+            open: row.open,
+            high: row.high,
+            low: row.low,
+            close: row.close,
+            volume: row.vol,
+          };
+        })
+        .filter((item): item is KLinePoint => item !== null)
+        .sort((a, b) => Number(a.time) - Number(b.time)),
+    [selectedSeries?.rows]
   );
 
-  const latest = selectedSeries.rows[0];
+  const latest = useMemo(
+    () =>
+      [...(selectedSeries?.rows ?? [])]
+        .sort((a, b) => Number(a.trade_date) - Number(b.trade_date))
+        .at(-1),
+    [selectedSeries?.rows]
+  );
 
   return (
     <section className="space-y-6">
@@ -111,25 +157,52 @@ export default function SectorTrendAnalystPage() {
           <label htmlFor="sector-trend-date" className="text-sm font-medium text-slate-700">
             选择日期
           </label>
-          <select
-            id="sector-trend-date"
-            value={selectedDate}
-            onChange={(event) => setSelectedDate(event.target.value)}
-            className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:border-slate-400"
-          >
-            {availableDates.map((date) => (
-              <option key={date} value={date}>
-                {date}
-              </option>
-            ))}
-          </select>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button id="sector-trend-date" variant="outline" className="w-[180px] justify-start text-left">
+                {selectedDate || "请选择"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={selectedCalendarDate}
+                onSelect={(date) => {
+                  if (!date) return;
+                  const normalizedDate = dateToCompactDateString(date);
+                  if (availableDateSet.has(normalizedDate)) {
+                    setSelectedDate(normalizedDate);
+                  }
+                }}
+                disabled={(date) => !availableDateSet.has(dateToCompactDateString(date))}
+              />
+            </PopoverContent>
+          </Popover>
         </div>
+        {loadingDates ? <p className="mt-3 text-sm text-slate-500">日期加载中...</p> : null}
       </div>
 
+      {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+      {!loadingDetail && !trendOutput ? (
+        <Card className="rounded-none py-0">
+          <CardContent className="px-4 py-4 text-sm text-slate-500">暂无可展示的数据。</CardContent>
+        </Card>
+      ) : null}
+      {loadingDetail ? (
+        <Card className="rounded-none py-0">
+          <CardContent className="px-4 py-4 text-sm text-slate-500">数据加载中...</CardContent>
+        </Card>
+      ) : null}
+      {trendOutput ? (
+        <>
       <div className="grid gap-4 md:grid-cols-3">
-        <MetricCard title="市场状态" value={trendOutput.marketRegime} />
-        <MetricCard title="当前板块" value={selectedSeries.name} />
-        <MetricCard title="最近涨跌幅" value={`${latest.pctChange.toFixed(2)}%`} tone={latest.pctChange >= 0 ? "up" : "down"} />
+        <MetricCard title="市场状态" value={trendOutput.market_regime} />
+        <MetricCard title="当前板块" value={selectedSeries?.name ?? "-"} />
+        <MetricCard
+          title="最近涨跌幅"
+          value={latest ? `${latest.pct_change.toFixed(2)}%` : "-"}
+          tone={latest ? (latest.pct_change >= 0 ? "up" : "down") : "neutral"}
+        />
       </div>
 
       <Card className="rounded-none py-0">
@@ -143,9 +216,9 @@ export default function SectorTrendAnalystPage() {
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <TagListCard title="趋势主线" items={trendOutput.leadingThemes} variant="secondary" />
-        <TagListCard title="修复机会" items={trendOutput.reversalOpportunities} variant="outline" />
-        <TagListCard title="风险板块" items={trendOutput.topRiskSectors} variant="destructive" />
+        <TagListCard title="趋势主线" items={trendOutput.leading_themes} variant="secondary" />
+        <TagListCard title="修复机会" items={trendOutput.reversal_opportunities} variant="outline" />
+        <TagListCard title="风险板块" items={trendOutput.top_risk_sectors} variant="destructive" />
       </div>
 
       <Card className="rounded-none py-0">
@@ -164,12 +237,13 @@ export default function SectorTrendAnalystPage() {
               className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:border-slate-400"
             >
               {sectorSeriesList.map((item) => (
-                <option key={item.tsCode} value={item.tsCode}>
-                  {item.name}（{item.tsCode}）
+                <option key={item.ts_code} value={item.ts_code}>
+                  {item.name}（{item.ts_code}）
                 </option>
               ))}
             </select>
           </div>
+          {loadingSeries ? <p className="text-sm text-slate-500">板块行情加载中...</p> : null}
           <div className="border border-slate-200 p-2">
             <p className="mb-2 text-xs text-slate-500">K线与成交量（按时间升序）</p>
             <KLineVolumeChart data={klineData} height={380} />
@@ -189,15 +263,37 @@ export default function SectorTrendAnalystPage() {
           </ul>
         </CardContent>
       </Card>
+        </>
+      ) : null}
     </section>
   );
 }
 
-function toUtcTimestamp(yyyymmdd: string): UTCTimestamp {
-  const year = Number(yyyymmdd.slice(0, 4));
-  const month = Number(yyyymmdd.slice(4, 6)) - 1;
-  const day = Number(yyyymmdd.slice(6, 8));
-  return (Date.UTC(year, month, day) / 1000) as UTCTimestamp;
+function toUtcTimestamp(dateText: string): UTCTimestamp | null {
+  const normalized = dateText.replace(/-/g, "");
+  if (!/^\d{8}$/.test(normalized)) return null;
+
+  const year = Number(normalized.slice(0, 4));
+  const month = Number(normalized.slice(4, 6)) - 1;
+  const day = Number(normalized.slice(6, 8));
+  const timeMs = Date.UTC(year, month, day);
+  if (!Number.isFinite(timeMs)) return null;
+
+  return (timeMs / 1000) as UTCTimestamp;
+}
+
+function compactDateStringToDate(value: string) {
+  const year = Number(value.slice(0, 4));
+  const month = Number(value.slice(4, 6));
+  const day = Number(value.slice(6, 8));
+  return new Date(year, month - 1, day, 12, 0, 0);
+}
+
+function dateToCompactDateString(date: Date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}${month}${day}`;
 }
 
 function MetricCard({

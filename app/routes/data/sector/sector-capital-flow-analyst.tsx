@@ -1,6 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Button } from "~/components/ui/button";
+import { Calendar } from "~/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "~/components/ui/popover";
 import {
   Bar,
   BarChart,
@@ -12,130 +15,91 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { SectorDailyRow, SectorFlowPoint } from "~/types/data/sector";
-
-const sectorAgentOutputByDate = {
-  "2025-03-20": {
-  summary:
-    "整体市场资金呈净流出状态，融资融券、深股通、沪股通等大盘指数类板块持续大幅流出，资金流向集中在光通信、CPO、光纤、F5G、光刻机等科技创新板块，且这些板块在5日、10日、20日窗口中出现资本异动，显示资金短期偏好。",
-  conclusion:
-    "市场资金面偏空，建议谨慎操作，规避融资融券、深股通、沪股通、国企改革、储能、绿色电力、华为概念、人工智能、机器人概念、光伏概念等持续流出板块；对光通信、CPO、光纤、F5G、光刻机等热点板块可适度关注，但需注意整体流动性不足。",
-  highlights: [
-    "1日窗口净流出约-882万元，融资融券净流出-472万元为最大流出项",
-    "5日窗口净流出扩大至约-2529万元，融资融券、深股通、国企改革流出居前",
-    "10日、20日窗口融资融券净流出分别为-3792万元、-9564万元，持续大幅流出",
-    "共封装光学(CPO)、光纤概念、F5G概念、光刻机在5日、10日、20日均出现资本异动（capital_spike）",
-    "5G、芯片概念、数据中心、液冷服务器、6G概念、量子科技、东数西算(算力)等在1日窗口表现强势",
-  ],
-  marketBias: "bearish",
-  hotSectors: [
-    "共封装光学(CPO)",
-    "光纤概念",
-    "F5G概念",
-    "光刻机",
-    "5G",
-    "芯片概念",
-    "数据中心",
-    "液冷服务器",
-    "6G概念",
-    "量子科技",
-    "东数西算(算力)",
-  ],
-  riskSectors: [
-    "融资融券",
-    "深股通",
-    "沪股通",
-    "国企改革",
-    "储能",
-    "绿色电力",
-    "华为概念",
-    "人工智能",
-    "机器人概念",
-    "光伏概念",
-    "新能源汽车",
-    "锂电池概念",
-    "一带一路",
-    "DeepSeek概念",
-    "同花顺漂亮100",
-    "证金持股",
-  ],
-  },
-  "2025-03-19": {
-    summary: "资金面整体仍偏弱，权重方向延续流出，科技细分维持活跃。",
-    conclusion: "短线继续防御，关注具备连续异动的科技板块，控制高波动风险。",
-    highlights: [
-      "1日窗口净流出约-730万元，权重板块拖累明显",
-      "5日窗口净流出约-2100万元，趋势未扭转",
-      "CPO、光纤、光刻机等方向维持强势净流入",
-    ],
-    marketBias: "bearish",
-    hotSectors: ["共封装光学(CPO)", "光纤概念", "光刻机", "5G", "数据中心"],
-    riskSectors: ["融资融券", "深股通", "沪股通", "国企改革", "储能", "绿色电力", "人工智能"],
-  },
-};
-
-const oneDaySectorFlowByDate: Record<string, SectorFlowPoint[]> = {
-  "2025-03-20": [
-    { name: "融资融券", netAmount: -472 },
-    { name: "深股通", netAmount: -310 },
-    { name: "沪股通", netAmount: -228 },
-    { name: "国企改革", netAmount: -145 },
-    { name: "储能", netAmount: -96 },
-    { name: "绿色电力", netAmount: -88 },
-    { name: "共封装光学(CPO)", netAmount: 186 },
-    { name: "光纤概念", netAmount: 168 },
-    { name: "F5G概念", netAmount: 154 },
-    { name: "光刻机", netAmount: 149 },
-    { name: "5G", netAmount: 133 },
-    { name: "芯片概念", netAmount: 122 },
-    { name: "数据中心", netAmount: 116 },
-    { name: "液冷服务器", netAmount: 98 },
-  ],
-  "2025-03-19": [
-    { name: "融资融券", netAmount: -425 },
-    { name: "深股通", netAmount: -276 },
-    { name: "沪股通", netAmount: -201 },
-    { name: "国企改革", netAmount: -132 },
-    { name: "储能", netAmount: -90 },
-    { name: "共封装光学(CPO)", netAmount: 173 },
-    { name: "光纤概念", netAmount: 151 },
-    { name: "光刻机", netAmount: 142 },
-    { name: "5G", netAmount: 127 },
-    { name: "数据中心", netAmount: 109 },
-  ],
-};
-
-const oneDayRowsByDate: Record<string, SectorDailyRow[]> = {
-  "2025-03-20": [
-    { tradeDate: "2025-03-20", tsCode: "885748.TI", name: "可燃冰", leadStock: "海默科技", pctChange: 4.76, netAmount: 1 },
-    { tradeDate: "2025-03-20", tsCode: "886008.TI", name: "减速器", leadStock: "大叶股份", pctChange: 2.6, netAmount: -8 },
-    { tradeDate: "2025-03-20", tsCode: "885426.TI", name: "海工装备", leadStock: "天海防务", pctChange: 2.56, netAmount: 23 },
-    { tradeDate: "2025-03-20", tsCode: "885372.TI", name: "页岩气", leadStock: "海默科技", pctChange: 2.21, netAmount: 10 },
-    { tradeDate: "2025-03-20", tsCode: "886000.TI", name: "一体化压铸", leadStock: "今飞凯达", pctChange: 1.78, netAmount: 9 },
-  ],
-  "2025-03-19": [
-    { tradeDate: "2025-03-19", tsCode: "885881.TI", name: "云办公", leadStock: "*ST鹏博", pctChange: -1.36, netAmount: -9 },
-    { tradeDate: "2025-03-19", tsCode: "885947.TI", name: "DRG/DIP", leadStock: "国新健康", pctChange: -1.38, netAmount: -5 },
-    { tradeDate: "2025-03-19", tsCode: "885975.TI", name: "电子身份证", leadStock: "拓尔思", pctChange: -1.4, netAmount: -11 },
-    { tradeDate: "2025-03-19", tsCode: "885874.TI", name: "云游戏", leadStock: "*ST鹏博", pctChange: -1.75, netAmount: -23 },
-    { tradeDate: "2025-03-19", tsCode: "886091.TI", name: "华为手机", leadStock: "凯格精机", pctChange: -2.25, netAmount: -18 },
-  ],
-};
+import { getSectorCapitalFlowByTradeDate, getSectorCapitalFlowDates, type SectorCapitalFlowData } from "~/lib/sector";
 
 export default function SectorCapitalFlowAnalystPage() {
-  const availableDates = Object.keys(sectorAgentOutputByDate).sort((a, b) => (a > b ? -1 : 1));
-  const [selectedDate, setSelectedDate] = useState(availableDates[0]);
-  const sectorAgentOutput = useMemo(
-    () => sectorAgentOutputByDate[selectedDate as keyof typeof sectorAgentOutputByDate],
+  const [availableDates, setAvailableDates] = useState<string[]>([]);
+  const [selectedDate, setSelectedDate] = useState("");
+  const [sectorAgentOutput, setSectorAgentOutput] = useState<SectorCapitalFlowData | null>(null);
+  const [loadingDates, setLoadingDates] = useState(false);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [error, setError] = useState("");
+  const availableDateSet = useMemo(() => new Set(availableDates), [availableDates]);
+  const selectedCalendarDate = useMemo(
+    () => (selectedDate ? compactDateStringToDate(selectedDate) : undefined),
     [selectedDate]
   );
+
+  useEffect(() => {
+    let disposed = false;
+    const loadDates = async () => {
+      setLoadingDates(true);
+      setError("");
+      try {
+        const response = await getSectorCapitalFlowDates();
+        const dates = response.data?.dates ?? [];
+        if (disposed) return;
+        setAvailableDates(dates);
+        setSelectedDate(dates[0] ?? "");
+      } catch (err) {
+        if (disposed) return;
+        setError(err instanceof Error ? err.message : "获取可选日期失败");
+      } finally {
+        if (!disposed) setLoadingDates(false);
+      }
+    };
+    loadDates();
+    return () => {
+      disposed = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedDate) {
+      setSectorAgentOutput(null);
+      return;
+    }
+    let disposed = false;
+    const loadDetail = async () => {
+      setLoadingDetail(true);
+      setError("");
+      try {
+        const response = await getSectorCapitalFlowByTradeDate(selectedDate);
+        if (disposed) return;
+        setSectorAgentOutput(response.data ?? null);
+      } catch (err) {
+        if (disposed) return;
+        setSectorAgentOutput(null);
+        setError(err instanceof Error ? err.message : "获取板块资金流分析数据失败");
+      } finally {
+        if (!disposed) setLoadingDetail(false);
+      }
+    };
+    loadDetail();
+    return () => {
+      disposed = true;
+    };
+  }, [selectedDate]);
+
   const sortedFlow = useMemo(
-    () => [...(oneDaySectorFlowByDate[selectedDate] ?? oneDaySectorFlowByDate[availableDates[0]])].sort((a, b) => a.netAmount - b.netAmount),
-    [availableDates, selectedDate]
+    () =>
+      [...(sectorAgentOutput?.one_day_sector_flow ?? [])]
+        .map((item) => ({ name: item.name, netAmount: item.net_amount }))
+        .sort((a, b) => b.netAmount - a.netAmount),
+    [sectorAgentOutput?.one_day_sector_flow]
   );
+
   const oneDayRows = useMemo(
-    () => oneDayRowsByDate[selectedDate] ?? oneDayRowsByDate[availableDates[0]],
-    [availableDates, selectedDate]
+    () =>
+      (sectorAgentOutput?.one_day_rows ?? []).map((row) => ({
+        tradeDate: row.trade_date,
+        tsCode: row.ts_code,
+        name: row.name,
+        leadStock: row.lead_stock,
+        pctChange: row.pct_change,
+        netAmount: row.net_amount,
+      })),
+    [sectorAgentOutput?.one_day_rows]
   );
 
   return (
@@ -149,26 +113,49 @@ export default function SectorCapitalFlowAnalystPage() {
           <label htmlFor="sector-capital-date" className="text-sm font-medium text-slate-700">
             选择日期
           </label>
-          <select
-            id="sector-capital-date"
-            value={selectedDate}
-            onChange={(event) => setSelectedDate(event.target.value)}
-            className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:border-slate-400"
-          >
-            {availableDates.map((date) => (
-              <option key={date} value={date}>
-                {date}
-              </option>
-            ))}
-          </select>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button id="sector-capital-date" variant="outline" className="w-[180px] justify-start text-left">
+                {selectedDate || "请选择"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={selectedCalendarDate}
+                onSelect={(date) => {
+                  if (!date) return;
+                  const normalizedDate = dateToCompactDateString(date);
+                  if (availableDateSet.has(normalizedDate)) {
+                    setSelectedDate(normalizedDate);
+                  }
+                }}
+                disabled={(date) => !availableDateSet.has(dateToCompactDateString(date))}
+              />
+            </PopoverContent>
+          </Popover>
         </div>
+        {loadingDates ? <p className="mt-3 text-sm text-slate-500">日期加载中...</p> : null}
       </div>
 
+      {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+      {!loadingDetail && !sectorAgentOutput ? (
+        <Card className="rounded-none py-0">
+          <CardContent className="px-4 py-4 text-sm text-slate-500">暂无可展示的数据。</CardContent>
+        </Card>
+      ) : null}
+      {loadingDetail ? (
+        <Card className="rounded-none py-0">
+          <CardContent className="px-4 py-4 text-sm text-slate-500">数据加载中...</CardContent>
+        </Card>
+      ) : null}
+      {sectorAgentOutput ? (
+        <>
       <div className="grid gap-4 md:grid-cols-4">
-        <MetricCard title="市场偏向" value={sectorAgentOutput.marketBias} tone="bearish" />
-        <MetricCard title="1日净额" value="-882 万元" />
-        <MetricCard title="5日净额" value="-2529 万元" />
-        <MetricCard title="20日净额" value="-9564 万元" />
+        <MetricCard title="市场偏向" value={sectorAgentOutput.market_bias} tone="bearish" />
+        <MetricCard title="1日净额" value={`${sectorAgentOutput.one_day_net_amount ?? 0} 万元`} />
+        <MetricCard title="5日净额" value={`${sectorAgentOutput.five_day_net_amount ?? 0} 万元`} />
+        <MetricCard title="20日净额" value={`${sectorAgentOutput.twenty_day_net_amount ?? 0} 万元`} />
       </div>
 
       <Card className="rounded-none py-0">
@@ -184,7 +171,10 @@ export default function SectorCapitalFlowAnalystPage() {
                 <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 12 }} />
                 <ReferenceLine x={0} stroke="#94a3b8" />
                 <Tooltip
-                  formatter={(value: number) => [`${Number(value).toLocaleString()} 万元`, "净额"]}
+                  formatter={(value: unknown) => {
+                    const raw = Array.isArray(value) ? value[0] : value;
+                    return [`${Number(raw ?? 0).toLocaleString()} 万元`, "净额"];
+                  }}
                   contentStyle={{ borderRadius: 0, borderColor: "#cbd5e1" }}
                 />
                 <Bar dataKey="netAmount" radius={[0, 0, 0, 0]}>
@@ -202,8 +192,8 @@ export default function SectorCapitalFlowAnalystPage() {
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <TagListCard title="热点板块（可跟踪）" items={sectorAgentOutput.hotSectors} variant="secondary" />
-        <TagListCard title="风险板块（建议规避）" items={sectorAgentOutput.riskSectors} variant="destructive" />
+        <TagListCard title="热点板块（可跟踪）" items={sectorAgentOutput.hot_sectors} variant="secondary" />
+        <TagListCard title="风险板块（建议规避）" items={sectorAgentOutput.risk_sectors} variant="destructive" />
       </div>
 
       <Card className="rounded-none py-0">
@@ -262,6 +252,8 @@ export default function SectorCapitalFlowAnalystPage() {
           </ul>
         </CardContent>
       </Card>
+        </>
+      ) : null}
     </section>
   );
 }
@@ -312,4 +304,30 @@ function TagListCard({
       </CardContent>
     </Card>
   );
+}
+
+function compactDateStringToDate(value: string) {
+  const year = Number(value.slice(0, 4));
+  const month = Number(value.slice(4, 6));
+  const day = Number(value.slice(6, 8));
+  return new Date(year, month - 1, day, 12, 0, 0);
+}
+
+function dateToCompactDateString(date: Date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}${month}${day}`;
+}
+
+function dateStringToDate(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day, 12, 0, 0);
+}
+
+function dateToDateString(date: Date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }

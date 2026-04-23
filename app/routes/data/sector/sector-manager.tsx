@@ -1,65 +1,93 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Button } from "~/components/ui/button";
+import { Calendar } from "~/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Popover, PopoverContent, PopoverTrigger } from "~/components/ui/popover";
 import { Badge } from "~/components/ui/badge";
-
-const sectorManagerByDate = {
-  "2025-03-20": {
-    marketRegime: "mixed",
-    marketBias: "bearish",
-    actionBias: "defense",
-    favoredSectors: ["黄金", "贵金属", "贵金属Ⅲ", "贵重金属与矿石", "贵重金属与矿石(A股)"],
-    watchlistSectors: ["冰雪产业", "火电", "公路铁路运输"],
-    riskSectors: [
-      "房地产开发",
-      "房地产服务",
-      "房地产投资信托",
-      "乘用车",
-      "汽车整车",
-      "汽车零部件",
-      "证券",
-      "证券Ⅲ",
-      "多种化学制品",
-      "商品化工",
-      "通信设备",
-      "化学制品",
-      "铝",
-    ],
-    coreSignals: [
-      "宏观避险情绪升温，明确聚焦黄金等贵金属板块。",
-      "行业趋势显示电信、医疗、生物科技等主线持续走强，但资金流数据缺失无法验证共振。",
-      "宏观与行业趋势共同指向房地产、汽车、证券及部分高位化工、金属板块为风险方向。",
-      "市场处于情绪悲观、结构分化的混合状态，宏观仓位建议低仓位防御。",
-    ],
-    confidence: 0.5,
-    sectorSummary:
-      "当日行业结构呈现分化，趋势主线（电信、医疗、生物科技）与宏观避险主线（贵金属）并存，但缺乏资金流验证。宏观风险规避方向（房地产、汽车、证券）与行业高位转弱板块（化工、铝）高度重叠，构成明确的负面清单。执行上应遵循宏观防御建议，优先配置宏观聚焦的贵金属板块，并观察冰雪产业、火电等修复机会，对风险板块保持规避。",
-  },
-  "2025-03-19": {
-    marketRegime: "mixed",
-    marketBias: "bearish",
-    actionBias: "defense",
-    favoredSectors: ["黄金", "贵金属", "贵重金属与矿石", "公用事业"],
-    watchlistSectors: ["冰雪产业", "火电", "公路铁路运输", "焦炭加工"],
-    riskSectors: ["房地产开发", "乘用车", "汽车零部件", "证券Ⅲ", "商品化工", "通信设备", "铝"],
-    coreSignals: [
-      "宏观防御信号延续，贵金属仍是优选方向。",
-      "行业主线强势但分化加剧，轮动速度提升。",
-      "地产、汽车、券商等高弹性方向持续承压。",
-      "建议控制仓位，偏防御配置并保留修复观察仓。",
-    ],
-    confidence: 0.46,
-    sectorSummary:
-      "市场仍以结构分化为主，防御资产优先级较高。执行层面继续规避地产链与高位转弱板块，观察修复线索是否具备持续性。",
-  },
-};
+import {
+  getSectorManagerByTradeDate,
+  getSectorManagerDates,
+  type SectorManagerData,
+} from "~/lib/sector";
 
 export default function DataSectorPage() {
-  const availableDates = Object.keys(sectorManagerByDate).sort((a, b) => (a > b ? -1 : 1));
-  const [selectedDate, setSelectedDate] = useState(availableDates[0]);
-  const sectorManagerOutput = useMemo(
-    () => sectorManagerByDate[selectedDate as keyof typeof sectorManagerByDate],
+  const [availableDates, setAvailableDates] = useState<string[]>([]);
+  const [selectedDate, setSelectedDate] = useState("");
+  const [currentOutput, setCurrentOutput] = useState<SectorManagerData | null>(null);
+  const [loadingDates, setLoadingDates] = useState(false);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [error, setError] = useState("");
+  const availableDateSet = useMemo(() => new Set(availableDates), [availableDates]);
+  const selectedCalendarDate = useMemo(
+    () => (selectedDate ? compactDateStringToDate(selectedDate) : undefined),
     [selectedDate]
   );
+
+  useEffect(() => {
+    let disposed = false;
+
+    const loadDates = async () => {
+      setLoadingDates(true);
+      setError("");
+      try {
+        const response = await getSectorManagerDates();
+        const dates = response.data?.dates ?? [];
+        if (disposed) return;
+        setAvailableDates(dates);
+        setSelectedDate(dates[0] ?? "");
+      } catch (err) {
+        if (disposed) return;
+        setError(err instanceof Error ? err.message : "获取可选日期失败");
+      } finally {
+        if (!disposed) setLoadingDates(false);
+      }
+    };
+
+    loadDates();
+    return () => {
+      disposed = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedDate) {
+      setCurrentOutput(null);
+      return;
+    }
+
+    let disposed = false;
+    const loadDetail = async () => {
+      setLoadingDetail(true);
+      setError("");
+      try {
+        const response = await getSectorManagerByTradeDate(selectedDate);
+        if (disposed) return;
+        setCurrentOutput(response.data ?? null);
+      } catch (err) {
+        if (disposed) return;
+        setCurrentOutput(null);
+        setError(err instanceof Error ? err.message : "获取行业经理数据失败");
+      } finally {
+        if (!disposed) setLoadingDetail(false);
+      }
+    };
+
+    loadDetail();
+    return () => {
+      disposed = true;
+    };
+  }, [selectedDate]);
+
+  const marketBiasTone = useMemo(() => {
+    const bias = currentOutput?.market_bias?.toLowerCase() ?? "";
+    if (bias.includes("bear")) return "down" as const;
+    return "neutral" as const;
+  }, [currentOutput?.market_bias]);
+
+  const favored = currentOutput?.favored_sectors ?? [];
+  const watchlist = currentOutput?.watchlist_sectors ?? [];
+  const risk = currentOutput?.risk_sectors ?? [];
+  const coreSignals = currentOutput?.core_signals ?? [];
 
   return (
     <section className="space-y-6">
@@ -72,57 +100,104 @@ export default function DataSectorPage() {
           <label htmlFor="sector-manager-date" className="text-sm font-medium text-slate-700">
             选择日期
           </label>
-          <select
-            id="sector-manager-date"
-            value={selectedDate}
-            onChange={(event) => setSelectedDate(event.target.value)}
-            className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:border-slate-400"
-          >
-            {availableDates.map((date) => (
-              <option key={date} value={date}>
-                {date}
-              </option>
-            ))}
-          </select>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                id="sector-manager-date"
+                variant="outline"
+                className="w-[180px] justify-start text-left"
+              >
+                {selectedDate || "请选择"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={selectedCalendarDate}
+                onSelect={(date) => {
+                  if (!date) return;
+                  const normalizedDate = dateToCompactDateString(date);
+                  if (availableDateSet.has(normalizedDate)) {
+                    setSelectedDate(normalizedDate);
+                  }
+                }}
+                disabled={(date) => !availableDateSet.has(dateToCompactDateString(date))}
+              />
+            </PopoverContent>
+          </Popover>
         </div>
+        {loadingDates ? <p className="mt-3 text-sm text-slate-500">日期加载中...</p> : null}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <MetricCard title="市场状态" value={sectorManagerOutput.marketRegime} />
-        <MetricCard title="市场偏向" value={sectorManagerOutput.marketBias} tone="down" />
-        <MetricCard title="执行偏向" value={sectorManagerOutput.actionBias} />
-        <MetricCard title="置信度" value={String(sectorManagerOutput.confidence)} />
-      </div>
+      {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+      {!loadingDetail && !currentOutput ? (
+        <Card className="rounded-none py-0">
+          <CardContent className="px-4 py-4 text-sm text-slate-500">暂无可展示的数据。</CardContent>
+        </Card>
+      ) : null}
+      {loadingDetail ? (
+        <Card className="rounded-none py-0">
+          <CardContent className="px-4 py-4 text-sm text-slate-500">数据加载中...</CardContent>
+        </Card>
+      ) : null}
+      {currentOutput ? (
+        <>
+          <div className="grid gap-4 md:grid-cols-4">
+            <MetricCard title="市场状态" value={currentOutput.market_regime} />
+            <MetricCard title="市场偏向" value={currentOutput.market_bias} tone={marketBiasTone} />
+            <MetricCard title="执行偏向" value={currentOutput.action_bias} />
+            <MetricCard title="置信度" value={String(currentOutput.confidence)} />
+          </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <TagListCard title="优选板块（Favored）" items={sectorManagerOutput.favoredSectors} variant="secondary" />
-        <TagListCard title="观察板块（Watchlist）" items={sectorManagerOutput.watchlistSectors} variant="outline" />
-        <TagListCard title="风险板块（Risk）" items={sectorManagerOutput.riskSectors} variant="destructive" />
-      </div>
+          <div className="grid gap-4 lg:grid-cols-3">
+            <TagListCard title="优选板块（Favored）" items={favored} variant="secondary" />
+            <TagListCard title="观察板块（Watchlist）" items={watchlist} variant="outline" />
+            <TagListCard title="风险板块（Risk）" items={risk} variant="destructive" />
+          </div>
 
-      <Card className="rounded-none py-0">
-        <CardHeader className="px-4 pt-4 pb-0">
-          <CardTitle className="text-base text-slate-900">核心信号</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 px-4 pt-3 pb-4 text-sm leading-6 text-slate-700">
-          <ul className="space-y-1">
-            {sectorManagerOutput.coreSignals.map((item) => (
-              <li key={item}>- {item}</li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
+          <Card className="rounded-none py-0">
+            <CardHeader className="px-4 pt-4 pb-0">
+              <CardTitle className="text-base text-slate-900">核心信号</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 px-4 pt-3 pb-4 text-sm leading-6 text-slate-700">
+              {coreSignals.length ? (
+                <ul className="space-y-1">
+                  {coreSignals.map((item, index) => (
+                    <li key={`${index}-${item}`}>- {item}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-slate-500">暂无</p>
+              )}
+            </CardContent>
+          </Card>
 
-      <Card className="rounded-none py-0">
-        <CardHeader className="px-4 pt-4 pb-0">
-          <CardTitle className="text-base text-slate-900">行业经理总结</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 px-4 pt-3 pb-4 text-sm leading-6 text-slate-700">
-          <p>{sectorManagerOutput.sectorSummary}</p>
-        </CardContent>
-      </Card>
+          <Card className="rounded-none py-0">
+            <CardHeader className="px-4 pt-4 pb-0">
+              <CardTitle className="text-base text-slate-900">行业经理总结</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 px-4 pt-3 pb-4 text-sm leading-6 text-slate-700">
+              <p>{currentOutput.sector_summary}</p>
+            </CardContent>
+          </Card>
+        </>
+      ) : null}
     </section>
   );
+}
+
+function compactDateStringToDate(value: string) {
+  const year = Number(value.slice(0, 4));
+  const month = Number(value.slice(4, 6));
+  const day = Number(value.slice(6, 8));
+  return new Date(year, month - 1, day, 12, 0, 0);
+}
+
+function dateToCompactDateString(date: Date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}${month}${day}`;
 }
 
 function MetricCard({
@@ -160,13 +235,17 @@ function TagListCard({
         <CardTitle className="text-base text-slate-900">{title}</CardTitle>
       </CardHeader>
       <CardContent className="px-4 pt-3 pb-4">
-        <div className="flex flex-wrap gap-2">
-          {items.map((item) => (
-            <Badge key={item} variant={variant}>
-              {item}
-            </Badge>
-          ))}
-        </div>
+        {items.length ? (
+          <div className="flex flex-wrap gap-2">
+            {items.map((item, index) => (
+              <Badge key={`${index}-${item}`} variant={variant}>
+                {item}
+              </Badge>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-slate-500">暂无</p>
+        )}
       </CardContent>
     </Card>
   );
