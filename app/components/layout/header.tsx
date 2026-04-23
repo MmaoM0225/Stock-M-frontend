@@ -1,14 +1,14 @@
 import { Link } from "react-router";
 
 const navItems = [
-  { to: "/agents", label: "Agent 运行" },
+  { to: "/agents", label: "Agents" },
   { to: "/data", label: "数据查询" },
   { to: "/portfolio", label: "收益与持仓" },
 ];
 
 export function Header() {
   return (
-    <header className="border-b bg-white">
+    <header className="relative z-20 border-b bg-white">
       <div className="flex h-16 w-full items-center justify-between px-4 md:px-6">
         <Link
           to="/"
